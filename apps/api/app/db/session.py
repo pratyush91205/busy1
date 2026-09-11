@@ -32,6 +32,12 @@ def build_engine(url: str) -> Engine:
     if url.startswith("postgresql+psycopg://"):
         connect_args["prepare_threshold"] = None
         connect_args["connect_timeout"] = CONNECT_TIMEOUT_SECONDS
+        # TIMESTAMPTZ always stores UTC, but it is *rendered* in the session's
+        # timezone, so without this the API returns whatever offset the server
+        # happens to sit in. Every due date, grace period and week boundary in
+        # this system is defined in UTC; pinning the session means what reads
+        # back agrees with them instead of quietly depending on the host.
+        connect_args["options"] = "-c timezone=UTC"
     return create_engine(url, pool_pre_ping=True, connect_args=connect_args)
 
 
