@@ -193,9 +193,10 @@ def insert_vehicle(
         return connection.execute(
             text(
                 "INSERT INTO vehicles (registration_number, make, model, current_odometer, "
+                "service_baseline_odometer, service_baseline_date, "
                 "service_date_interval, service_mileage_interval) "
-                "VALUES (:registration, 'Ford', 'Transit', :odometer, :date_interval, "
-                ":mileage_interval) RETURNING id"
+                "VALUES (:registration, 'Ford', 'Transit', :odometer, :odometer, "
+                "CURRENT_DATE, :date_interval, :mileage_interval) RETURNING id"
             ),
             {
                 "registration": registration,

@@ -122,13 +122,22 @@ def move(
 
 
 def advance_to(
-    api: TestClient, manager: dict[str, str], service_id: int, target: str
+    api: TestClient,
+    manager: dict[str, str],
+    service_id: int,
+    target: str,
+    completion_odometer: int = 60_000,
 ) -> None:
-    """Walk a record forward through the legal path to ``target``."""
+    """Walk a record forward through the legal path to ``target``.
+
+    The completion reading is a parameter because it cannot be below the
+    vehicle's current odometer - a test that has driven the van first has to
+    say so.
+    """
     steps = [
         ("booked", {"scheduled_date": "2026-10-01"}),
         ("in_service", {}),
-        ("completed", {"completion_odometer": 60_000}),
+        ("completed", {"completion_odometer": completion_odometer}),
     ]
     for status, extra in steps:
         response = move(api, manager, service_id, status, **extra)

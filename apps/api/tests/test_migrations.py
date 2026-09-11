@@ -40,7 +40,7 @@ def test_upgrade_and_downgrade_round_trip(
 
     # The session fixture already migrated to head.
     assert DOMAIN_TABLES <= table_names(migrated_engine)
-    assert applied_revisions(migrated_engine) == ["0002_domain_schema"]
+    assert applied_revisions(migrated_engine) == ["0003_service_cycle_baseline"]
 
     command.downgrade(config, "base")
     remaining = table_names(migrated_engine)
