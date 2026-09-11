@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import User
+from app.models import User, UserRole
 
 
 def get_by_email(db: Session, email: str) -> User | None:
@@ -23,3 +23,14 @@ def get_by_email(db: Session, email: str) -> User | None:
 
 def get_by_id(db: Session, user_id: int) -> User | None:
     return db.get(User, user_id)
+
+
+def list_technicians(db: Session) -> list[User]:
+    """Every technician, by name. Small by nature - a fleet has a handful."""
+    return list(
+        db.scalars(
+            select(User)
+            .where(User.role == UserRole.TECHNICIAN)
+            .order_by(User.full_name.asc())
+        ).all()
+    )
