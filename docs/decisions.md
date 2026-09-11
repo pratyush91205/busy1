@@ -164,3 +164,37 @@
   carried `status` or `technician_ids`, that permission would quietly become
   the permission to reassign the record or skip the lifecycle. Ignoring extra
   fields relies on remembering to; not accepting them is structural.
+
+## Decision 18
+
+- **Chose:** store `service_baseline_odometer` and `service_baseline_date` on
+  the vehicle, reset on each completion.
+- **Rejected:** deriving both from the newest completed service record.
+- **Why:** `current_odometer` can't be its own baseline — it moves, so "due at
+  current + interval" is a target that runs away as the van is driven. Zero is
+  worse: a used van joining with 80,000 miles would be due the day it arrived.
+  The date half could have been derived, but that's a lateral join on every row
+  of a filtered fleet list, and keeping the two halves symmetric makes due-ness
+  a single-table predicate. Trade-off: two columns that have to be kept
+  correct on completion, rather than one place to read the truth from.
+
+## Decision 19
+
+- **Chose:** the due and overdue rules take `now` and the grace period as
+  arguments.
+- **Rejected:** reading `datetime.now()` and the setting inside them.
+- **Why:** a record can then be aged two weeks in a test without sleeping or
+  patching the clock, and two apps with different grace periods can disagree
+  about the same row — which is how I know the grace period is really
+  configuration and not a hard-coded 7. Trade-off: every caller has to pass
+  them, so `utc_now()` exists to keep that honest in one place.
+
+## Decision 20
+
+- **Chose:** the due filter in SQL and the per-row answer in Python, with a
+  test asserting they agree.
+- **Rejected:** one implementation used for both.
+- **Why:** paging and totals have to be filtered in the database, and the
+  detail view needs the reason, not just a boolean. Two implementations of one
+  rule will drift, so the test compares the full unfiltered list's computed
+  answers against the filtered set. Trade-off: the rule is written twice.

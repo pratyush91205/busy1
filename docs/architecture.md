@@ -57,7 +57,31 @@ convenience — bypassing it gets a screen of 401s.
 
 Built so far: `GET /health`, which runs `SELECT 1` and returns 503 if the
 database doesn't answer; `POST /auth/login` and `GET /auth/me`; the six
-vehicle routes; ten service routes; and `GET /technicians`.
+vehicle routes; ten service routes; `GET /technicians`; and three alert
+routes.
+
+## Due and overdue: two questions
+
+Easy to conflate, kept apart deliberately.
+
+**Is a vehicle due?** From its intervals and the point the current cycle
+counts from. Either interval alone is enough — they are not required
+together. It's what tells a manager to open a record.
+
+**Is a record overdue?** From status `due`, `due_since`, and the grace
+period. It's about a record that was opened and then left unbooked.
+
+A vehicle can be due with no record open; a record can be overdue for a
+vehicle that isn't otherwise due yet. Neither is stored and neither needs a
+job — both follow from the database and the clock, which is what the brief
+asks for.
+
+An alert is not a row either. It *is* an overdue record, so there's nothing
+to create or reconcile and nothing that can disagree with the records. Only
+the dismissal is stored, and because it points at a record and one record
+is one cycle, the next cycle's alert appears with nothing to reset. The
+dismissal row is its own audit trail — who and when — so it isn't in
+`audit_events`, whose five types are a closed set with a check constraint.
 
 ## Two kinds of authorization
 

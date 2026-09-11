@@ -11,7 +11,8 @@ Two hours a day, one phase each, specced in `.claude/specs/` before being built.
 | 3 | Authentication and authorization | 2h 00 | 2h 15 |
 | 4 | Vehicle management | 2h 00 | 2h 10 |
 | 5 | Service records, lifecycle, audit | 3h 00 | 3h 20 |
-| | Total | 10h 00 | 11h 35 |
+| 6 | Due, overdue and alerts | 2h 00 | 2h 30 |
+| | Total | 12h 00 | 14h 05 |
 
 ## Order
 
@@ -57,6 +58,14 @@ Two things cost the time. A whitespace-only description passed
 database's not-blank constraint as a 503 — fixed by stripping before the
 length check. And I ran two pytest processes against the same test
 database at once and spent a while reading the wreckage as a real bug.
+
+Session 6, 30 minutes over, all of it on one thing the spec had wrong.
+The mileage half of "is this vehicle due" needs a fixed point to count
+from, and there wasn't one: `current_odometer` moves, and 0 would make a
+used van due on arrival. That meant a migration mid-spec. I wrote it for
+the odometer alone first, then rolled it back and did both columns, since
+the date half had the same shape and doing it in one migration is cleaner
+than two.
 
 ## Cut
 

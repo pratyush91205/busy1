@@ -9,14 +9,17 @@ TIMESTAMPTZ timestamps, every foreign key `ON DELETE RESTRICT`.
 fleet_manager, technician).
 
 **vehicles** — registration_number (unique), make, model, current_odometer int
-(>= 0), service_date_interval int days (> 0), service_mileage_interval int
-miles (> 0), is_archived bool (indexed).
+(>= 0), service_baseline_odometer int (>= 0), service_baseline_date date,
+service_date_interval int days (> 0), service_mileage_interval int miles
+(> 0), is_archived bool (indexed). The two baseline columns are where the
+current cycle counts from; both reset on completion.
 
 **service_records** — vehicle_id fk, cycle_number int (unique with vehicle_id),
 description text (not blank), status varchar(20) (check: due, booked,
 in_service, completed), scheduled_date date, due_since timestamptz, completed_at
 timestamptz, completion_odometer int. Indexed on vehicle_id, status,
-scheduled_date, updated_at, due_since. One row is one service cycle.
+scheduled_date, updated_at, due_since, and (status, due_since) for the
+overdue query. One row is one service cycle.
 
 **service_technicians** — composite pk (service_id, technician_id), assigned_at.
 
@@ -66,10 +69,17 @@ Nothing. Two deliberate omissions:
 `due_since` is not denormalised — it records when a cycle became due, which
 can't be recomputed once a vehicle's intervals are edited.
 
+The two baseline columns are the one thing close to a denormalisation. The
+date half could be read off the newest completed record; the mileage half
+genuinely can't be derived, since `current_odometer` moves. Storing both
+keeps them symmetric and makes due-ness a single-table predicate instead of
+a lateral join per row. Cost: they have to be reset correctly on
+completion, and a bad reset is invisible until a vehicle is due at the
+wrong time.
+
 ## First to break at 100x
 
 1. `ILIKE` search over description. Needs a GIN index on a tsvector.
-2. The overdue query, on two single-column indexes. Wants a composite
-   (status, due_since).
+2. ~~The overdue query, on two single-column indexes.~~ Done in `0003`.
 3. Dashboard aggregates — later, and the answer is a summary table, not a cache.
 4. `audit_events` size. Grows forever by design; partition by month.

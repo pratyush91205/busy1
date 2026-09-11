@@ -216,3 +216,48 @@ timeline back — six events, each with the right actor.
 The transition table is tested exhaustively rather than by example: all sixteen
 ordered pairs, three allowed and thirteen refused. Three happy-path tests would
 pass equally well against a service layer that allowed everything.
+
+## Due, overdue and alerts
+
+### Prompt
+
+The spec for due calculation, overdue with a grace period, and alerts with
+cycle-scoped dismissal — specced together because dismissal only makes sense
+once overdue exists.
+
+### What you got
+
+The overdue half was right first time: derived from status plus `due_since`
+plus the grace period, with both passed in rather than read from a module.
+
+The due half was wrong, and the spec was wrong with it. I had written a
+`baseline` helper whose two branches returned the same value, which made the
+bug obvious on re-reading — but the real problem was underneath: the mileage
+comparison needs a fixed point to count from, and nothing stored one.
+`current_odometer` can't serve, because it moves and the target runs away.
+
+The SQL `due_predicate` also came out with a dead `if False` branch and muddled
+`&`/`|` precedence.
+
+### What you corrected
+
+Added the two baseline columns in a migration, mid-spec. Wrote it for the
+odometer alone, then rolled it back and did both columns in one migration since
+the date half has the same shape.
+
+Rewrote the predicate as plain integer arithmetic — in PostgreSQL date minus
+date is a number of days — so it reads the way the rule is written.
+
+Added the test I actually wanted: the SQL filter and the Python rule are two
+implementations of one rule, so a test compares the computed answer for every
+vehicle against the filtered set.
+
+### Verified rather than trusted
+
+Drove the whole alert lifecycle against the local database: a vehicle not due,
+driven past its mileage interval and becoming due by mileage, a record opened
+and inside its grace period, aged nine days and becoming overdue while still
+stored as `due`, a technician refused both reading and dismissing, dismissal
+clearing the badge while the record stayed overdue, a second dismissal
+refused, the cycle completed and both counters reset, cycle 2 opened, and its
+alert appearing once aged — with nothing reset or expired to make that happen.
