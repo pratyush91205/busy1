@@ -57,8 +57,20 @@ convenience — bypassing it gets a screen of 401s.
 
 Built so far: `GET /health`, which runs `SELECT 1` and returns 503 if the
 database doesn't answer; `POST /auth/login` and `GET /auth/me`; the six
-vehicle routes; ten service routes; `GET /technicians`; and three alert
-routes.
+vehicle routes; ten service routes; `GET /technicians`; three alert routes;
+the odometer upload; and the CSV export.
+
+## CSV in and out
+
+The bulk odometer upload is the one place that isn't one transaction per
+request. Each row commits alone, so a single typo can't discard the rest of
+a depot's readings. The only whole-file rejection is a bad header — that
+isn't a wrong row, it means the file isn't what the endpoint takes. Rules
+aren't reimplemented for CSV: it calls the same `vehicle_service` checks the
+API uses, so the two can't disagree.
+
+The export streams row by row from a cursor, filtered by the same
+parameters as the service list. Nothing is assembled in the browser.
 
 ## Due and overdue: two questions
 

@@ -12,7 +12,8 @@ Two hours a day, one phase each, specced in `.claude/specs/` before being built.
 | 4 | Vehicle management | 2h 00 | 2h 10 |
 | 5 | Service records, lifecycle, audit | 3h 00 | 3h 20 |
 | 6 | Due, overdue and alerts | 2h 00 | 2h 30 |
-| | Total | 12h 00 | 14h 05 |
+| 7 | Bulk odometer upload and export | 2h 00 | 2h 00 |
+| | Total | 14h 00 | 16h 05 |
 
 ## Order
 
@@ -67,6 +68,14 @@ the odometer alone first, then rolled it back and did both columns, since
 the date half had the same shape and doing it in one migration is cleaner
 than two.
 
+Session 7, on estimate. Two things caught late rather than by a test:
+`/services/export.csv` was registered after `/services/{service_id}`, so
+it was being read as a service with the id "export.csv"; and
+`email-validator` and `python-multipart` were installed into the venv when
+the features were written but never added to `requirements.txt`. The suite
+runs in that same venv, so it could never have caught the second one — a
+fresh deploy would have failed at import.
+
 ## Cut
 
 Nothing cut from the ten goals.
@@ -78,3 +87,8 @@ no hard-coded hosts.
 If time runs short: Playwright tests go first, then UI polish, then CSV export
 conveniences. Not cut: authorization, lifecycle validation, due/overdue
 correctness, audit trail, per-row bulk reporting.
+
+Over the 12-hour estimate by about four hours. The overrun is mostly two
+things: a schema change mid-spec in session 6, and the size of session 5 —
+records, assignment, lifecycle and audit had to be one piece because every
+mutation writes its audit event in the same transaction.

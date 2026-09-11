@@ -261,3 +261,57 @@ stored as `due`, a technician refused both reading and dismissing, dismissal
 clearing the badge while the record stayed overdue, a second dismissal
 refused, the cycle completed and both counters reset, cycle 2 opened, and its
 alert appearing once aged — with nothing reset or expired to make that happen.
+
+## Bulk odometer upload and CSV export
+
+### Prompt
+
+One spec for both — CSV in and CSV out. They share nothing but their shape, so
+the spec says so rather than pretending they're one feature.
+
+### What you got
+
+The non-transactional per-row design came out right, including reusing
+`vehicle_service`'s rules rather than writing new ones for CSV.
+
+Three things did not. The row cap was checked *while* iterating, so a 5,001-row
+file applied 5,000 rows before refusing — both slow and the wrong answer.
+`/services/export.csv` was registered after `/services/{service_id}`, so FastAPI
+read it as a service with the id "export.csv". And a test helper borrowed the
+app's database session without closing it, which held a transaction open and
+made the fixture's TRUNCATE hang the whole run.
+
+### What you corrected
+
+Moved the row cap ahead of any processing — count the lines, refuse the file,
+touch nothing.
+
+Registered the reports router before the service router, and wrote a test that
+asserts the export route isn't shadowed, so the comment isn't the only guard.
+
+Opened and closed the session explicitly in that test.
+
+Also found, by reading `requirements.txt` against the venv rather than by any
+test: `email-validator` and `python-multipart` were never pinned. The suite
+runs in the same venv, so it could not have caught it — a fresh deploy would
+have failed at import.
+
+### The mistake repeated
+
+Ran a second pytest process while one was still going, again, and then killed
+one mid-`downgrade base`, which left the test database half-migrated. Spent
+several minutes reading that as a code bug before recognising the shape from
+session 5. Two runs must not share one database.
+
+### Verified rather than trusted
+
+Uploaded a mixed CSV against the local database — one good row, one reading
+below the stored one, one unknown registration, one archived vehicle — and
+confirmed by re-reading the fleet that exactly the good row was applied and the
+other three vehicles were untouched. A bad header returned 422 and wrote
+nothing; a technician got 403.
+
+Downloaded the export and read it: correct header row, `attachment` disposition,
+`text/csv`, ISO-8601 UTC timestamps, two technicians in one cell, and the
+derived overdue column reading `yes` for the record that had been aged past the
+grace period.

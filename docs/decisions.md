@@ -198,3 +198,33 @@
   detail view needs the reason, not just a boolean. Two implementations of one
   rule will drift, so the test compares the full unfiltered list's computed
   answers against the filtered set. Trade-off: the rule is written twice.
+
+## Decision 21
+
+- **Chose:** no transaction around a bulk odometer upload. Each row commits on
+  its own.
+- **Rejected:** one transaction for the file, which is what every other write
+  in this codebase does.
+- **Why:** a depot uploads fifty readings and one is a typo. Rolling back the
+  other forty-nine makes the feature useless, and the brief asks for per-row
+  results explicitly. Trade-off: a crash mid-file leaves a partial run. That's
+  acceptable because every row that landed was individually valid, and
+  re-uploading is safe — a repeated reading is an accepted no-op.
+
+## Decision 22
+
+- **Chose:** the CSV identifies vehicles by registration number.
+- **Rejected:** the database id.
+- **Why:** the person uploading readings from the depot knows the plate, not a
+  surrogate key. It also means the normaliser has to be shared with the API, or
+  a registration that works in the form is unknown in the file — so
+  `normalise_registration` is one function used by both.
+
+## Decision 23
+
+- **Chose:** the export streams row by row from a server-side cursor.
+- **Rejected:** building the CSV as one string and returning it.
+- **Why:** at fleet scale either works, but this costs nothing to write now and
+  stops the export being the first endpoint to fall over as data grows. The
+  brief also calls out building reports in the browser as the thing not to do,
+  and streaming makes that impossible rather than merely avoided.
