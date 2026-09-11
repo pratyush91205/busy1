@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.api.routes import (
     alerts,
     auth,
+    dashboard,
     health,
     reports,
     services,
@@ -23,3 +24,4 @@ api_router.include_router(vehicles.router)
 api_router.include_router(services.router)
 api_router.include_router(technicians.router)
 api_router.include_router(alerts.router)
+api_router.include_router(dashboard.router)
