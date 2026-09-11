@@ -33,8 +33,27 @@ actor, close out the cycle's overdue state → commit, or roll all of it back.
 The rollback is the point: a service can't be completed with no audit event to
 show for it.
 
-Only `GET /health` exists so far. It runs `SELECT 1` and returns 503 if the
-database doesn't answer.
+## Authentication
+
+`POST /auth/login` checks a bcrypt hash and returns a 12-hour HS256 token
+carrying `sub`, `role` and `exp`. A wrong password and an unknown email give the
+same 401 and the same message, and the unknown-email path spends a dummy bcrypt
+verification so the two take comparable time — otherwise the pair answers "does
+this address have an account" for anyone with a stopwatch.
+
+Protected routes depend on `get_current_user`, which decodes the token and then
+loads the user from the database. The `role` claim is never consulted for a
+decision, so rewriting it gains nothing (`decisions.md`, 10).
+`require_role("fleet_manager")` is the only authorization primitive; it can't
+express "only the records assigned to me", which is per-resource and belongs to
+the service layer that owns the resource.
+
+The browser keeps the token in `localStorage` and reads the user from
+`/auth/me`, never by decoding the token. The `(app)` layout's redirect is
+convenience — bypassing it gets a screen of 401s.
+
+Built so far: `GET /health`, which runs `SELECT 1` and returns 503 if the
+database doesn't answer, plus `POST /auth/login` and `GET /auth/me`.
 
 ## Not built
 

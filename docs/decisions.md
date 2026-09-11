@@ -64,3 +64,36 @@
   production with nothing to install, and changed my mind once the tests became
   the main feedback loop. Trade-off: the migration still has to be run against
   the real database before the deployment is trusted.
+
+## Decision 8
+
+- **Chose:** access token in `localStorage`, sent as a bearer header.
+- **Rejected:** an httpOnly cookie.
+- **Why:** the API and the frontend are on different origins, so a cookie needs
+  `SameSite=None; Secure` plus credentialed CORS on both ends. That's more
+  moving parts to get wrong than the XSS exposure it removes, on an app that
+  renders no user-supplied HTML. Trade-off: a successful XSS reads the token,
+  and the 12-hour expiry is the only thing bounding that.
+
+## Decision 9
+
+- **Chose:** no signup endpoint. Users come from `scripts/create_user.py`.
+- **Rejected:** a registration route, even one restricted to managers.
+- **Why:** the goals need sign-in, not user management, and a route that
+  accepts a role is exactly the hole the rest of the system spends its time
+  closing. With no such route, "a client cannot choose its own role" is a
+  property of the API surface rather than a validation that has to hold.
+  Trade-off: demo accounts have to be seeded, so their credentials belong in
+  `SUBMISSION.md`.
+
+## Decision 10
+
+- **Chose:** re-read the user row on every authenticated request; the `role`
+  claim in the token is for logging and for deciding which buttons to draw.
+- **Rejected:** trusting the claim, which is signed and therefore not forgeable.
+- **Why:** signed is not the same as current. Trusting it means a role changed
+  in the database does nothing until the token expires, up to 12 hours later,
+  and a deleted user keeps working. It also leaves one decision resting on the
+  key never leaking. A test signs a token claiming `fleet_manager` for a
+  technician with the application's own key and asserts 403. Trade-off: one
+  indexed primary-key lookup per request.

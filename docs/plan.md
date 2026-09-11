@@ -8,7 +8,8 @@ Two hours a day, one phase each, specced in `.claude/specs/` before being built.
 |---|---|---|---|
 | 1 | Repo setup and walking skeleton | 2h 00 | 2h 20 |
 | 2 | Database schema and migrations | 1h 00 | 1h 30 |
-| | Total | 3h 00 | 3h 50 |
+| 3 | Authentication and authorization | 2h 00 | 2h 15 |
+| | Total | 5h 00 | 6h 05 |
 
 ## Order
 
@@ -30,6 +31,12 @@ Session 2, 30 minutes over: the winget PostgreSQL package installed `bin/`
 without `lib/`, so `initdb` failed and there was no cluster. Switched to the
 standalone binaries. The schema itself was quick — the spec had settled the
 awkward parts already.
+
+Session 3, 15 minutes over, both on things the spec hadn't decided: bcrypt
+refuses passwords over 72 bytes, so hashing and verifying had to answer that
+differently (hashing raises at the operator, verifying returns false at the
+client). And `useSyncExternalStore` instead of reading `localStorage` into
+state in an effect — the lint rule was right, and it's the better hook anyway.
 
 ## Cut
 

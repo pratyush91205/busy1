@@ -77,3 +77,45 @@ disappears on `downgrade base` — Alembic keeps the table and empties it.
 Read the DDL from `alembic upgrade head --sql` before any database existed;
 tried UPDATE and DELETE on `audit_events` from raw psql, not just the ORM; left
 the four tests needing a real database visibly skipping until one existed.
+
+## Authentication and authorization
+
+### Prompt
+
+The auth spec, then "implement it". The spec had already settled the parts
+worth arguing about: identical answers for a wrong password and an unknown
+email, the role re-read from the database rather than taken from the token.
+
+### What you got
+
+Close to right, and two things the spec hadn't decided. bcrypt 5 raises on a
+password over 72 bytes rather than truncating it, which nothing had an answer
+for. And `useToken` read `localStorage` into state inside an effect — the lint
+rule caught it, correctly.
+
+### What you corrected
+
+Split the bcrypt limit two ways: `hash_password` raises, because that input is
+an operator seeding a user who should not be handed a silently shortened
+password, and `verify_password` returns false, because that input is anonymous
+and a login must never be a 500.
+
+Rewrote `useToken` with `useSyncExternalStore`. `localStorage` is an external
+store, not React state.
+
+Also moved settings onto `app.state` — `create_app(settings)` had only ever
+reached CORS, so a test app would still have verified tokens against whatever
+`.env` was on disk.
+
+### Verified rather than trusted
+
+Seeded both roles and drove login, `/auth/me`, a wrong password, an unknown
+email, a missing header and a garbage token with curl against the real
+database. Checked the stored value really is `$2b$12$` and not the password.
+The test that matters signs a token claiming `fleet_manager` for a technician
+using the application's own key: it asserts 403, not 401, which is what proves
+the token was accepted and the database row overrode the claim.
+
+Not verified: the login form in a browser. The page builds, lints, typechecks
+and server-renders its form, and the CORS preflight for both `/auth/login` and
+a bearer `/auth/me` was checked with curl — but nobody has clicked it.
