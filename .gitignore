@@ -10,3 +10,7 @@ venv/
 .env.*.local
 *.log
 .DS_Store
+.venv/
+.pytest_cache/
+.vercel/
+next-env.d.ts
