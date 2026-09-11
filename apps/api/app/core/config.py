@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     cors_origins: str
     overdue_grace_period_days: int = 7
 
+    # How long an access token stays valid. There is no refresh token, so this
+    # is also how long a session lasts before the user has to sign in again.
+    auth_token_ttl_hours: int = 12
+
     # Alembic needs a session-mode connection (it uses prepared statements);
     # the application itself runs against the transaction pooler. When unset,
     # migrations fall back to database_url.
