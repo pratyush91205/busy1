@@ -7,7 +7,7 @@ turns a bad value into a readable 422 instead of an IntegrityError.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -61,6 +61,20 @@ class VehicleUpdate(BaseModel):
         return value.upper() if value is not None else None
 
 
+class VehicleServiceStatusRead(BaseModel):
+    """Why a vehicle is or is not due, not merely whether.
+
+    Derived on read from the intervals and the stored cycle baseline; nothing
+    here is persisted.
+    """
+
+    is_due: bool
+    reason: str | None
+    next_due_date: date
+    next_due_odometer: int
+    has_open_record: bool
+
+
 class VehicleRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -69,8 +83,28 @@ class VehicleRead(BaseModel):
     make: str
     model: str
     current_odometer: int
+    # Where the current cycle counts from.
+    service_baseline_odometer: int
+    service_baseline_date: date
     service_date_interval: int
     service_mileage_interval: int
     is_archived: bool
     created_at: datetime
     updated_at: datetime
+
+    service_status: VehicleServiceStatusRead | None = None
+
+    @classmethod
+    def of(cls, vehicle, has_open_record: bool, now: datetime) -> "VehicleRead":
+        from app.services import maintenance
+
+        read = cls.model_validate(vehicle)
+        status = maintenance.vehicle_service_status(vehicle, has_open_record, now)
+        read.service_status = VehicleServiceStatusRead(
+            is_due=status.is_due,
+            reason=status.reason,
+            next_due_date=status.next_due_date,
+            next_due_odometer=status.next_due_odometer,
+            has_open_record=status.has_open_record,
+        )
+        return read

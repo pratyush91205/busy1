@@ -8,6 +8,8 @@ raises is the one that gets noticed in a test rather than in production.
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -111,9 +113,18 @@ def list_page(
     technician_id: int | None = None,
     sort: ServiceSort = ServiceSort.UPDATED_AT,
     order: SortOrder = SortOrder.DESC,
+    overdue: bool | None = None,
+    grace_days: int = 7,
+    now: datetime | None = None,
 ) -> tuple[list[ServiceRecord], int]:
     filters = dict(
-        search=search, vehicle_id=vehicle_id, status=status, technician_id=technician_id
+        search=search,
+        vehicle_id=vehicle_id,
+        status=status,
+        technician_id=technician_id,
+        overdue=overdue,
+        grace_days=grace_days,
+        now=now,
     )
 
     total = db.scalar(
@@ -142,6 +153,9 @@ def apply_filters(
     vehicle_id: int | None,
     status: ServiceStatus | None,
     technician_id: int | None,
+    overdue: bool | None = None,
+    grace_days: int = 7,
+    now: datetime | None = None,
 ) -> Select:
     if vehicle_id is not None:
         query = query.where(ServiceRecord.vehicle_id == vehicle_id)
@@ -161,6 +175,18 @@ def apply_filters(
             )
             .exists()
         )
+
+    if overdue is not None and now is not None:
+        # Overdue is derived, so it is a predicate rather than a stored column:
+        # still Due, and the grace period elapsed since it became Due. Applied
+        # in SQL so `total` and the page agree.
+        threshold = now - timedelta(days=grace_days)
+        condition = (
+            (ServiceRecord.status == ServiceStatus.DUE)
+            & ServiceRecord.due_since.is_not(None)
+            & (ServiceRecord.due_since <= threshold)
+        )
+        query = query.where(condition if overdue else ~condition)
 
     if search:
         term = f"%{escape_like(search.strip())}%"

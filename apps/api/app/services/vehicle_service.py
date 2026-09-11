@@ -14,6 +14,7 @@ from app.models import User, Vehicle
 from app.repositories import vehicle as vehicle_repository
 from app.schemas.pagination import PageParams
 from app.schemas.vehicle import SortOrder, VehicleCreate, VehicleSort, VehicleUpdate
+from app.services import maintenance
 from app.services.errors import ConflictError, NotFoundError
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,8 @@ def list_vehicles(
     include_archived: bool = False,
     sort: VehicleSort = VehicleSort.REGISTRATION_NUMBER,
     order: SortOrder = SortOrder.ASC,
+    due: bool | None = None,
+    today=None,
 ) -> tuple[list[Vehicle], int]:
     return vehicle_repository.list_page(
         db,
@@ -35,6 +38,15 @@ def list_vehicles(
         include_archived=include_archived,
         sort=sort,
         order=order,
+        due=due,
+        today=today,
+    )
+
+
+def open_record_vehicle_ids(db: Session, vehicles: list[Vehicle]) -> set[int]:
+    """Which of these vehicles have a cycle open, in one query rather than N."""
+    return vehicle_repository.vehicle_ids_with_open_record(
+        db, [vehicle.id for vehicle in vehicles]
     )
 
 
@@ -53,7 +65,14 @@ def get_vehicle(db: Session, vehicle_id: int) -> Vehicle:
 def create_vehicle(db: Session, payload: VehicleCreate, actor: User) -> Vehicle:
     require_unused_registration(db, payload.registration_number)
 
-    vehicle = Vehicle(**payload.model_dump())
+    vehicle = Vehicle(
+        **payload.model_dump(),
+        # The first cycle counts from where the vehicle came in: its mileage on
+        # arrival, and today. Not from zero, which would make a used van due
+        # the day it joined the fleet.
+        service_baseline_odometer=payload.current_odometer,
+        service_baseline_date=maintenance.utc_now().date(),
+    )
     db.add(vehicle)
     db.commit()
     db.refresh(vehicle)

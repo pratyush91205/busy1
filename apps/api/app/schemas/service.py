@@ -101,6 +101,25 @@ class ServiceRead(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    # Derived, never stored. `status` above still holds only the four values;
+    # overdue is status Due plus an elapsed grace period.
+    is_overdue: bool = False
+    overdue_since: datetime | None = None
+
+    @classmethod
+    def of(cls, service, grace_days: int, now: datetime) -> "ServiceRead":
+        """Build from a record, resolving the derived overdue fields.
+
+        The grace period is passed in rather than read here, so one request
+        answers with one consistent value and a test can use a different one.
+        """
+        from app.services import maintenance
+
+        read = cls.model_validate(service)
+        read.overdue_since = maintenance.overdue_threshold(service, grace_days)
+        read.is_overdue = maintenance.is_overdue(service, grace_days, now)
+        return read
+
 
 class NoteRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)

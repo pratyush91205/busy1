@@ -61,6 +61,9 @@ def list_services(
     technician_id: int | None = None,
     sort: ServiceSort = ServiceSort.UPDATED_AT,
     order: SortOrder = SortOrder.DESC,
+    overdue: bool | None = None,
+    grace_days: int = 7,
+    now: datetime | None = None,
 ) -> tuple[list[ServiceRecord], int]:
     """A page of records, scoped to what the actor may see.
 
@@ -80,6 +83,9 @@ def list_services(
         technician_id=technician_id,
         sort=sort,
         order=order,
+        overdue=overdue,
+        grace_days=grace_days,
+        now=now,
     )
 
 
@@ -257,6 +263,10 @@ def complete(
     service.completion_odometer = request.completion_odometer
     # The service just recorded a newer reading than the vehicle had.
     vehicle.current_odometer = request.completion_odometer
+    # And the next cycle counts from here - both counters - rather than from
+    # the original vehicle creation. This is the reset the brief asks for.
+    vehicle.service_baseline_odometer = request.completion_odometer
+    vehicle.service_baseline_date = service.completed_at.date()
     # This cycle is over, so it is no longer due or overdue.
     service.due_since = None
 
