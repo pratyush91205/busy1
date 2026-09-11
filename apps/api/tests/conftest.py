@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 # Importing app.main builds the application, which by design refuses to start
@@ -24,6 +25,7 @@ os.environ.setdefault("CORS_ORIGINS", "http://localhost:3000")
 import pytest  # noqa: E402
 from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
+from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import Engine, text  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
@@ -122,12 +124,22 @@ def client() -> Iterator[TestClient]:
 
 
 @pytest.fixture
-def db_client(migrated_engine: Engine) -> Iterator[TestClient]:
-    """A client talking to the migrated test database."""
-    app = create_app(build_test_settings())
+def db_client(clean_db: Engine) -> Iterator[TestClient]:
+    """A client talking to the migrated test database, with empty tables."""
+    with client_for(create_app(build_test_settings()), clean_db) as test_client:
+        yield test_client
+
+
+@contextmanager
+def client_for(app: FastAPI, engine: Engine) -> Iterator[TestClient]:
+    """Point ``app`` at ``engine`` and wrap it in a client.
+
+    Shared with the tests that build a throwaway app to exercise a dependency,
+    so those apps get the same session handling as the real one.
+    """
 
     def override_get_db() -> Iterator[Session]:
-        with Session(migrated_engine) as session:
+        with Session(engine) as session:
             yield session
 
     app.dependency_overrides[get_db] = override_get_db
