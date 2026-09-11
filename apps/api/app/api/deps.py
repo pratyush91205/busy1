@@ -17,7 +17,7 @@ import logging
 from collections.abc import Callable, Iterable
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -26,6 +26,7 @@ from app.core.config import Settings
 from app.db.session import get_db
 from app.models import User
 from app.repositories import user as user_repository
+from app.schemas.pagination import DEFAULT_LIMIT, MAX_LIMIT, PageParams
 
 logger = logging.getLogger(__name__)
 
@@ -123,3 +124,19 @@ def require_role(*roles: str) -> Callable[..., User]:
 
 def describe(roles: Iterable[str]) -> str:
     return " or ".join(sorted(roles))
+
+
+def page_params(
+    page: Annotated[int, Query(ge=1)] = 1,
+    limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
+) -> PageParams:
+    """Page and size as query parameters, shared by every list endpoint.
+
+    A dependency rather than a Pydantic query-parameter model: it documents
+    both parameters individually in the OpenAPI schema, and the bounds are
+    enforced by FastAPI before the service layer is reached.
+    """
+    return PageParams(page=page, limit=limit)
+
+
+PageQuery = Annotated[PageParams, Depends(page_params)]
