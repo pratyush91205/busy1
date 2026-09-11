@@ -9,7 +9,8 @@ Two hours a day, one phase each, specced in `.claude/specs/` before being built.
 | 1 | Repo setup and walking skeleton | 2h 00 | 2h 20 |
 | 2 | Database schema and migrations | 1h 00 | 1h 30 |
 | 3 | Authentication and authorization | 2h 00 | 2h 15 |
-| | Total | 5h 00 | 6h 05 |
+| 4 | Vehicle management | 2h 00 | 2h 10 |
+| | Total | 7h 00 | 8h 15 |
 
 ## Order
 
@@ -37,6 +38,13 @@ refuses passwords over 72 bytes, so hashing and verifying had to answer that
 differently (hashing raises at the operator, verifying returns false at the
 client). And `useSyncExternalStore` instead of reading `localStorage` into
 state in an effect — the lint rule was right, and it's the better hook anyway.
+
+Session 4, 10 minutes over. FastAPI didn't bind a Pydantic model as query
+parameters the way I expected, so paging became an explicit dependency —
+which documents both parameters properly anyway. Then a curl of a real
+response showed timestamps coming back as `+05:30`: TIMESTAMPTZ stores UTC
+but renders in the session's timezone. Pinned the session to UTC before the
+dashboard's week buckets could inherit the problem.
 
 ## Cut
 

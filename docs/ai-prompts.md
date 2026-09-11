@@ -119,3 +119,44 @@ the token was accepted and the database row overrode the claim.
 Not verified: the login form in a browser. The page builds, lints, typechecks
 and server-renders its form, and the CORS preflight for both `/auth/login` and
 a bearer `/auth/me` was checked with curl — but nobody has clicked it.
+
+## Vehicle management
+
+### Prompt
+
+The vehicle spec, then "implement it". The spec decided up front that archived
+vehicles refuse edits, and that paging would be built once here for services to
+reuse.
+
+### What you got
+
+Mostly right. `Annotated[PageParams, Query()]` was wrong — FastAPI bound it as
+one required query parameter literally called `params`, so every list request
+came back 422 before a single filter was exercised.
+
+Separately, batching two commits into one shell command with two heredocs
+mangled both: the wrong files in one, the message "Initial commit" on the
+other. Same lesson as session 2, relearned.
+
+### What you corrected
+
+Paging became an explicit dependency taking `page` and `limit`. Less clever,
+documents both parameters in the OpenAPI schema, and doesn't rest on a FastAPI
+version detail.
+
+Reset the two bad commits and redid them one command at a time.
+
+The rule ordering in `update_vehicle` was right first time — validate
+everything, then assign — but nothing proved it, so I added the test that
+would fail if it were ever reordered: send a lower odometer *and* a valid make
+change together, assert 409, then assert the make is unchanged.
+
+### Verified rather than trusted
+
+curl against the local database for each rule: normalisation (` van001 ` stored
+as `VAN001`), a technician refused 403 on create, a lower odometer refused 409,
+a duplicate refused 409, an archived vehicle refusing an edit, and the default
+list hiding archived rows while `include_archived=true` shows them.
+
+That's also how the timezone bug surfaced — `created_at` came back `+05:30`.
+Nothing in the test suite compared a timestamp, so no test would have found it.

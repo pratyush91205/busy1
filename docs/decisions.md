@@ -97,3 +97,33 @@
   key never leaking. A test signs a token claiming `fleet_manager` for a
   technician with the application's own key and asserts 403. Trade-off: one
   indexed primary-key lookup per request.
+
+## Decision 11
+
+- **Chose:** normalise registration numbers to trimmed uppercase before every
+  write and lookup.
+- **Rejected:** a case-insensitive unique index, or storing whatever was typed.
+- **Why:** the unique index is case-sensitive, so `van001` and `VAN001` would be
+  two vehicles for the same van. Normalising makes the index already there
+  sufficient, and uppercase is the form on the plate. Trade-off: a registration
+  that is genuinely lowercase can't be stored as typed, which UK plates never
+  are.
+
+## Decision 12
+
+- **Chose:** an archived vehicle refuses every edit until it is restored.
+- **Rejected:** letting archived vehicles be edited normally.
+- **Why:** the brief doesn't require this, but it gives the bulk-odometer
+  upload a real answer for a row naming an archived vehicle — rejected, with a
+  reason — instead of quietly updating something nobody is driving. Trade-off:
+  fixing a typo on an archived vehicle takes two calls.
+
+## Decision 13
+
+- **Chose:** service functions raise domain errors; one handler maps them to
+  status codes.
+- **Rejected:** raising `HTTPException` from the service layer.
+- **Why:** a business rule isn't an HTTP concern, and a rule that raises
+  `HTTPException` can't be tested without a request. Routes end up with no
+  try/except and the shape of a 409 is decided once. Trade-off: one more
+  indirection between raising and the response.

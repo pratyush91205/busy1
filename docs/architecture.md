@@ -53,7 +53,17 @@ The browser keeps the token in `localStorage` and reads the user from
 convenience — bypassing it gets a screen of 401s.
 
 Built so far: `GET /health`, which runs `SELECT 1` and returns 503 if the
-database doesn't answer, plus `POST /auth/login` and `GET /auth/me`.
+database doesn't answer; `POST /auth/login` and `GET /auth/me`; and the six
+vehicle routes.
+
+## Listing
+
+`GET /vehicles` filters, sorts and pages in SQL — `ILIKE`, `ORDER BY`,
+`LIMIT`, `OFFSET`, one `COUNT`. `limit` is capped at 100 so a list endpoint
+can't become a full-table export, sort columns are an enum rather than an
+interpolated string, and `%` in a search term is escaped. The shape
+(`items`, `total`, `page`, `limit`, `total_pages`) is shared, so the service
+listing reuses it rather than inventing a second one.
 
 ## Not built
 
@@ -61,5 +71,11 @@ database doesn't answer, plus `POST /auth/login` and `GET /auth/me`.
 - A signup endpoint — users are seeded; one accepting a role would undermine
   the authorization model.
 - Login rate limiting — needs shared state, which a free tier doesn't have.
+- Any audit trail for vehicles. `audit_events.service_id` is NOT NULL, so
+  the table can't hold a vehicle-scoped event: who archived a vehicle or
+  changed an interval is logged, not recoverable from the database. Doing it
+  properly means making `service_id` nullable and adding an entity column.
+- A DELETE for vehicles. Archive is the only removal, which is what keeps
+  service history readable.
 - Odometer history and stored overdue alerts — see `decisions.md`.
 - Any scheduler. Maintenance state must follow from the database and the clock.
