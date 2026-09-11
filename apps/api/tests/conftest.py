@@ -25,16 +25,28 @@ import pytest  # noqa: E402
 from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
-from sqlalchemy import Engine, delete, insert, select  # noqa: E402
+from sqlalchemy import Engine, text  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
 from app.core.config import ConfigError, Settings, load_settings  # noqa: E402
 from app.db.session import build_engine, get_db  # noqa: E402
 from app.main import create_app  # noqa: E402
-from app.models.deployment_check import DeploymentCheck  # noqa: E402
 
 API_ROOT = Path(__file__).resolve().parents[1]
 MISSING_ENV_FILE = API_ROOT / "tests" / "does-not-exist.env"
+
+# Ordered so that TRUNCATE names every domain table in one statement. TRUNCATE
+# rather than DELETE because audit_events has a trigger that refuses DELETE -
+# row triggers do not fire on TRUNCATE.
+DOMAIN_TABLES = (
+    "audit_events",
+    "service_notes",
+    "service_technicians",
+    "overdue_alert_dismissals",
+    "service_records",
+    "vehicles",
+    "users",
+)
 
 
 def build_test_settings(**overrides: object) -> Settings:
@@ -86,6 +98,23 @@ def migrated_engine(test_database_url: str) -> Iterator[Engine]:
 
 
 @pytest.fixture
+def clean_db(migrated_engine: Engine) -> Iterator[Engine]:
+    """A migrated engine with every domain table emptied first."""
+    truncate(migrated_engine)
+    try:
+        yield migrated_engine
+    finally:
+        truncate(migrated_engine)
+
+
+def truncate(engine: Engine) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text(f"TRUNCATE {', '.join(DOMAIN_TABLES)} RESTART IDENTITY CASCADE")
+        )
+
+
+@pytest.fixture
 def client() -> Iterator[TestClient]:
     """A client whose database dependency is never used or overridden here."""
     with TestClient(create_app(build_test_settings())) as test_client:
@@ -104,22 +133,3 @@ def db_client(migrated_engine: Engine) -> Iterator[TestClient]:
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as test_client:
         yield test_client
-
-
-@pytest.fixture
-def empty_deployment_check(migrated_engine: Engine) -> Iterator[None]:
-    """Remove the seeded rows for one test, then put them back."""
-    with Session(migrated_engine) as session:
-        saved = [
-            {"label": row.label, "checked_at": row.checked_at}
-            for row in session.execute(select(DeploymentCheck)).scalars()
-        ]
-        session.execute(delete(DeploymentCheck))
-        session.commit()
-    try:
-        yield
-    finally:
-        with Session(migrated_engine) as session:
-            if saved:
-                session.execute(insert(DeploymentCheck), saved)
-            session.commit()
