@@ -1,144 +1,81 @@
 # AI prompts
 
-I used Claude Code throughout, mostly through two repeating steps: write a spec
-for the next phase, then implement it. The prompts below are the ones that
-mattered, in the order I used them, including the ones that produced something
-I had to throw away.
+I used Claude Code throughout, in a loop: write a spec for the next phase, then
+implement it. The ones worth recording, in order.
 
-## Setting up a repeatable way of working
+## Setting up the workflow
 
-### Prompt
+**Prompt:** a `/create-spec` command defining what a spec must contain — data
+model, business rules with their HTTP rejections, permissions, API table, audit
+events, tests traceable to the rules, definition of done. Then run it per phase.
 
-I wrote a `/create-spec` command for the project telling the model what a spec
-has to contain: data model, business rules with their HTTP rejections,
-permissions, API table, audit events, tests traceable to the rules, and a
-definition of done. Then I ran it per phase, starting with the walking skeleton.
+**Got:** usable specs. The "risks and open questions" section earned its place
+immediately by flagging that the project sat inside an unrelated git repository.
 
-### What I got
+**Corrected:** added "never restate the project rules". The first spec spent a
+third of its length repeating the stack and conventions already written down
+elsewhere.
 
-A spec that was usable as-is. The part that paid for itself was the "risks and
-open questions" section, which flagged that the project was sitting inside an
-unrelated git repository and that the deployment repo name had never been
-decided.
+## Writing the backend modules
 
-### What I corrected
+**Prompt:** "write the config, session, model, schema and repository modules."
 
-I had to add "never restate the project rules" to the command. The first spec
-spent a third of its length repeating the tech stack and error-handling
-conventions that were already written down elsewhere, which is noise when the
-budget is twelve hours.
+**Got:** one shell command with nine here-documents. It failed to parse on an
+unbalanced quote, and because it was a single command, nothing was written.
 
-## Writing all the backend modules at once
+**Corrected:** one file per write. Batching is fine for reading, bad for
+writing — a single syntax error takes the whole batch down.
 
-### Prompt
+## shadcn/ui
 
-"Write the config, session, model, schema and repository modules for the
-walking skeleton."
+**Prompt:** "run `shadcn init` and add the card and skeleton components."
 
-### What I got
+**Got:** an init that exited successfully and did nearly nothing. The CLI has
+changed: `--base-color` is gone and `-d` now scaffolds a new project.
 
-A single shell command containing nine here-documents, one per file. It failed
-to parse on an unbalanced quote, and because it was one command, nothing was
-written at all. Not a subtle bug, just a bad shape for the job.
+**Corrected:** wrote the four files it would have produced —
+`components.json`, the `cn` helper, card and skeleton — plus the token palette.
+`shadcn add` still works later, because `components.json` is what it needs.
 
-### What I corrected
+## Proving the health check works
 
-Rewrote it as one file per write. The lesson I kept for later phases: batching
-is fine for reading, bad for writing, because a single syntax error takes the
-whole batch down and leaves no partial progress to inspect.
+**Prompt:** "start the API against an unreachable database and check `/health`
+returns 503."
 
-## Initialising shadcn/ui
+**Got:** a request that never returned. psycopg waits indefinitely on a host
+that drops packets rather than refusing, so the check hung instead of reporting.
 
-### Prompt
-
-"Run `shadcn init` and add the card and skeleton components."
-
-### What I got
-
-An `init` that exited successfully and did almost nothing. The CLI has changed:
-`--base-color` no longer exists, and `-d` now means "scaffold a new project"
-rather than "use defaults here". No `components.json`, no `lib/utils.ts`, no
-components.
-
-### What I corrected
-
-Stopped fighting the tool and wrote the four files it would have produced:
-`components.json`, the `cn` helper, and the card and skeleton primitives, plus
-the neutral token palette in `globals.css`. Later phases can still run
-`shadcn add`, because `components.json` is what that command actually needs.
-This cost about twenty minutes and is the main reason session 1 ran over.
-
-## Proving the health check actually works
-
-### Prompt
-
-"Start the API against an unreachable database and check `/health` returns
-503."
-
-### What I got
-
-A request that never returned. psycopg sat waiting on a host that silently drops
-packets rather than refusing the connection, so the health check hung instead of
-reporting the failure it was written to report.
-
-### What I corrected
-
-Added a five second connect timeout to the engine. This one is worth keeping in
-mind, because the code looked right, the test for the 503 path passed (it used a
-session that raises immediately), and the bug only appeared when the thing was
-run against a realistically broken dependency rather than a mocked one.
+**Corrected:** added a connect timeout. Worth remembering: the code looked
+right and its unit test passed, because that test used a session raising
+immediately. Only a realistically broken dependency showed the bug.
 
 ## Installing PostgreSQL locally
 
-### Prompt
+**Prompt:** "install PostgreSQL locally so the schema tests run for real."
 
-"Install PostgreSQL locally so the schema tests run against a real database."
+**Got:** a winget install reporting success with `bin/` but no `lib/`, no data
+directory and no service. `initdb` then failed on a missing library.
 
-### What I got
+**Corrected:** used the standalone binaries archive and started a cluster with
+`pg_ctl` under my home directory, no admin rights needed.
 
-A winget install that reported success and left a broken installation: `bin/`
-present, `lib/` missing, no data directory, no service. `initdb` then failed on
-a missing `dict_snowball` library. The custom installer arguments passed for the
-superuser password are the likely cause.
+## The schema
 
-### What I corrected
+**Prompt:** the schema spec, then "implement it" — models, migration,
+constraints, indexes, tests.
 
-Switched to the standalone binaries archive, initialised a cluster under my home
-directory and started it with `pg_ctl`, which needs no administrator rights. The
-partial install was left in place, inert.
+**Got:** close to right, and the phase where the spec clearly paid off:
+`due_since` and the cycle identifier were there from the first migration rather
+than retrofitted.
 
-## Writing the schema
+**Corrected:** two things. `metadata` had to be renamed `event_metadata`,
+because it's reserved on SQLAlchemy's declarative base. And the round-trip test
+asserted `alembic_version` disappears on `downgrade base` — it doesn't, Alembic
+keeps the table and empties it.
 
-### Prompt
+## What I verified rather than trusted
 
-The schema spec, then "implement it": models, the Alembic migration,
-constraints, indexes, and the tests.
-
-### What I got
-
-Close to what I wanted, and it is the phase where the spec clearly did its job.
-The two things I most wanted right, `due_since` and the service cycle
-identifier, were there from the first migration rather than being retrofitted.
-
-### What I corrected
-
-Two things. The audit table's `metadata` column had to be renamed to
-`event_metadata`, because `metadata` is reserved on SQLAlchemy's declarative
-base. And the first version of the migration round-trip test asserted that
-`alembic_version` disappears on `downgrade base`; it does not, Alembic keeps the
-table and empties it, so the test now asserts no applied revision instead.
-
-## What I checked rather than trusted
-
-Generated code that touches the data model does not go in on the strength of
-looking correct:
-
-- I read the DDL from `alembic upgrade head --sql` by eye before any database
-  existed, to confirm the identity column, the `TIMESTAMPTZ` types and the
-  `NOT NULL` defaults were what I meant.
-- I tried `UPDATE` and `DELETE` on `audit_events` from a raw psql session, not
-  only through the ORM, because the ORM proves nothing about what someone else
-  can do later.
-- The four tests that needed a real database were left visibly skipping, with a
-  reason, until the database existed. They were not described as passing before
-  they had ever run.
+- Read the DDL from `alembic upgrade head --sql` before any database existed.
+- Tried `UPDATE` and `DELETE` on `audit_events` from raw psql, not just the ORM.
+- Left the four tests needing a real database visibly skipping, with a reason,
+  until one existed. They weren't called passing before they had run.
