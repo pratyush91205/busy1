@@ -15,6 +15,17 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.schemas.text import Collapsed, Stripped
 
 
+def normalise_registration(value: str) -> str:
+    """Collapse whitespace, trim, uppercase.
+
+    The unique index is case-sensitive, so without this ``van001`` and
+    ``VAN001`` are two vehicles for the same van. Defined once here because the
+    bulk CSV upload has to normalise exactly the same way the API does, or a
+    registration that works in the form is unknown in the file.
+    """
+    return " ".join(value.split()).upper()
+
+
 class VehicleSort(StrEnum):
     REGISTRATION_NUMBER = "registration_number"
     CURRENT_ODOMETER = "current_odometer"
@@ -37,8 +48,8 @@ class VehicleCreate(BaseModel):
 
     @field_validator("registration_number")
     @classmethod
-    def uppercase(cls, value: str) -> str:
-        return value.upper()
+    def normalise(cls, value: str) -> str:
+        return normalise_registration(value)
 
 
 class VehicleUpdate(BaseModel):
@@ -57,8 +68,8 @@ class VehicleUpdate(BaseModel):
 
     @field_validator("registration_number")
     @classmethod
-    def uppercase(cls, value: str | None) -> str | None:
-        return value.upper() if value is not None else None
+    def normalise(cls, value: str | None) -> str | None:
+        return normalise_registration(value) if value is not None else None
 
 
 class VehicleServiceStatusRead(BaseModel):
