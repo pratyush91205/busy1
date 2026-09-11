@@ -141,3 +141,23 @@ class AuditEventRead(BaseModel):
     # Null means the system acted rather than a person.
     actor: UserSummary | None
     created_at: datetime
+
+
+class OdometerRowResult(BaseModel):
+    """One row of a bulk upload, as the manager will read it."""
+
+    # 1-based over the data rows, not counting the header - what a person
+    # looking at their spreadsheet counts.
+    row: int
+    registration_number: str | None
+    status: str
+    message: str
+    previous_odometer: int | None = None
+    new_odometer: int | None = None
+
+
+class OdometerUploadReport(BaseModel):
+    total: int
+    succeeded: int
+    failed: int
+    results: list[OdometerRowResult]
