@@ -11,8 +11,9 @@ from alembic import context
 
 from app.core.config import get_settings
 from app.db.session import build_engine
-from app.models import deployment_check  # noqa: F401  registers the table
-from app.models.base import Base
+
+# Importing the package registers every model on Base.metadata.
+from app.models import Base
 
 config = context.config
 
