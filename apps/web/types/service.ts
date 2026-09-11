@@ -43,6 +43,10 @@ export interface ServiceRecord {
   technicians: UserSummary[];
   created_at: string;
   updated_at: string;
+
+  /** Derived server-side: status `due` plus an elapsed grace period. */
+  is_overdue: boolean;
+  overdue_since: string | null;
 }
 
 export interface ServiceNote {
@@ -72,6 +76,7 @@ export type ServiceSort = "scheduled_date" | "status" | "updated_at";
 
 export interface ServiceQuery {
   search?: string;
+  overdue?: boolean;
   vehicle_id?: number;
   status?: ServiceStatus;
   technician_id?: number;
