@@ -7,12 +7,27 @@ spec 03, rule 8.
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
 from app.auth.passwords import hash_password
 
 PASSWORD = "correct-horse-battery-staple"
+
+
+@lru_cache(maxsize=8)
+def cached_hash(password: str) -> str:
+    """Hash each distinct test password once per session.
+
+    bcrypt is deliberately slow, which is the right property in production and
+    the wrong one in a suite that seeds three users per test. Every seeded user
+    shares a password, so hashing it once turns minutes into seconds. That the
+    salt makes two hashes of one password differ is asserted directly in
+    test_passwords.py, so nothing here depends on it.
+    """
+    return hash_password(password)
 
 
 def create_user(
@@ -27,7 +42,7 @@ def create_user(
             {
                 "email": email,
                 "name": full_name,
-                "hash": hash_password(password),
+                "hash": cached_hash(password),
                 "role": role,
             },
         ).scalar_one()
