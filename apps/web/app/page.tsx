@@ -1,4 +1,4 @@
-import { DeploymentCheckCard } from "@/components/deployment-check-card";
+import { ApiStatusCard } from "@/components/api-status-card";
 
 export default function Home() {
   return (
@@ -6,13 +6,12 @@ export default function Home() {
       <header className="space-y-1">
         <h1 className="text-lg font-semibold">Fleet Maintenance</h1>
         <p className="text-sm text-muted-foreground">
-          Walking skeleton. The card below reads one row from PostgreSQL through
-          the API, proving the browser → API → database path before any business
-          logic exists.
+          The domain schema is in place. Sign-in and the fleet pages arrive with
+          Phase 4; until then this card confirms the API can reach PostgreSQL.
         </p>
       </header>
 
-      <DeploymentCheckCard />
+      <ApiStatusCard />
     </main>
   );
 }
