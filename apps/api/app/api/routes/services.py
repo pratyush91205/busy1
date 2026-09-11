@@ -16,7 +16,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
-from app.api.deps import CurrentUser, DbSession, PageQuery, require_role
+from app.api.deps import AppSettings, CurrentUser, DbSession, PageQuery, require_role
 from app.models import User, UserRole
 from app.models.enums import ServiceStatus
 from app.schemas.pagination import Page
@@ -32,17 +32,30 @@ from app.schemas.service import (
     TransitionRequest,
 )
 from app.schemas.vehicle import SortOrder
-from app.services import service_service
+from app.services import maintenance, service_service
 
 router = APIRouter(prefix="/services", tags=["services"])
 
 Manager = Annotated[User, Depends(require_role(UserRole.FLEET_MANAGER))]
 
 
+def read_of(service, settings) -> ServiceRead:
+    """Serialise a record with its derived overdue fields resolved.
+
+    Every route that returns a record goes through here. Skipping it on the
+    write paths would mean editing an overdue record's description reported it
+    as not overdue.
+    """
+    return ServiceRead.of(
+        service, settings.overdue_grace_period_days, maintenance.utc_now()
+    )
+
+
 @router.get("", response_model=Page[ServiceRead])
 def list_services(
     db: DbSession,
     actor: CurrentUser,
+    settings: AppSettings,
     params: PageQuery,
     search: Annotated[str | None, Query(max_length=200)] = None,
     vehicle_id: int | None = None,
@@ -50,9 +63,13 @@ def list_services(
     technician_id: int | None = None,
     sort: ServiceSort = ServiceSort.UPDATED_AT,
     order: SortOrder = SortOrder.DESC,
+    overdue: bool | None = None,
 ) -> Page[ServiceRead]:
     # A technician's scope is applied in the service layer, in SQL, so `total`
     # and the page size describe what they can actually see.
+    now = maintenance.utc_now()
+    grace = settings.overdue_grace_period_days
+
     services, total = service_service.list_services(
         db,
         actor,
@@ -63,33 +80,41 @@ def list_services(
         technician_id=technician_id,
         sort=sort,
         order=order,
+        overdue=overdue,
+        grace_days=grace,
+        now=now,
     )
     return Page[ServiceRead].build(
-        [ServiceRead.model_validate(service) for service in services], total, params
+        [ServiceRead.of(service, grace, now) for service in services], total, params
     )
 
 
 @router.get("/{service_id}", response_model=ServiceRead)
-def read_service(service_id: int, db: DbSession, actor: CurrentUser) -> ServiceRead:
-    return ServiceRead.model_validate(
-        service_service.get_service(db, service_id, actor)
-    )
+def read_service(
+    service_id: int, db: DbSession, actor: CurrentUser, settings: AppSettings
+) -> ServiceRead:
+    return read_of(service_service.get_service(db, service_id, actor), settings)
 
 
 @router.post("", response_model=ServiceRead, status_code=status.HTTP_201_CREATED)
 def create_service(
-    payload: ServiceCreate, db: DbSession, actor: Manager
+    payload: ServiceCreate, db: DbSession, actor: Manager, settings: AppSettings
 ) -> ServiceRead:
-    return ServiceRead.model_validate(
+    return read_of(
         service_service.create_service(
             db, payload.vehicle_id, payload.description, actor
-        )
+        ),
+        settings,
     )
 
 
 @router.patch("/{service_id}", response_model=ServiceRead)
 def update_service(
-    service_id: int, payload: ServiceUpdate, db: DbSession, actor: CurrentUser
+    service_id: int,
+    payload: ServiceUpdate,
+    db: DbSession,
+    actor: CurrentUser,
+    settings: AppSettings,
 ) -> ServiceRead:
     """Description only.
 
@@ -97,23 +122,26 @@ def update_service(
     technician editing a description cannot reassign the record through the
     same call.
     """
-    return ServiceRead.model_validate(
-        service_service.update_description(db, service_id, payload.description, actor)
+    return read_of(
+        service_service.update_description(db, service_id, payload.description, actor),
+        settings,
     )
 
 
 @router.post("/{service_id}/transition", response_model=ServiceRead)
 def transition_service(
-    service_id: int, payload: TransitionRequest, db: DbSession, actor: CurrentUser
+    service_id: int,
+    payload: TransitionRequest,
+    db: DbSession,
+    actor: CurrentUser,
+    settings: AppSettings,
 ) -> ServiceRead:
     """One endpoint for the whole lifecycle; the target status is data.
 
     Who may make a given move depends on the move, so the check is in the
     service layer rather than a role dependency here.
     """
-    return ServiceRead.model_validate(
-        service_service.transition(db, service_id, payload, actor)
-    )
+    return read_of(service_service.transition(db, service_id, payload, actor), settings)
 
 
 @router.post("/{service_id}/technicians", response_model=ServiceRead)
@@ -122,11 +150,11 @@ def assign_technician(
     payload: AssignTechnicianRequest,
     db: DbSession,
     actor: Manager,
+    settings: AppSettings,
 ) -> ServiceRead:
-    return ServiceRead.model_validate(
-        service_service.assign_technician(
-            db, service_id, payload.technician_id, actor
-        )
+    return read_of(
+        service_service.assign_technician(db, service_id, payload.technician_id, actor),
+        settings,
     )
 
 
