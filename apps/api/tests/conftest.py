@@ -34,6 +34,10 @@ from app.core.config import ConfigError, Settings, load_settings  # noqa: E402
 from app.db.session import build_engine, get_db  # noqa: E402
 from app.main import create_app  # noqa: E402
 
+# The service-record fixtures live in their own module so four test files
+# can share one world without conftest growing to hold all of it.
+pytest_plugins = ["tests.conftest_services"]
+
 API_ROOT = Path(__file__).resolve().parents[1]
 MISSING_ENV_FILE = API_ROOT / "tests" / "does-not-exist.env"
 

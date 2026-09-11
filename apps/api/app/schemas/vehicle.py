@@ -12,15 +12,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-
-def normalise_registration(value: str) -> str:
-    """Trimmed uppercase.
-
-    The unique index is case-sensitive, so without this ``van001`` and
-    ``VAN001`` are two vehicles. Normalising on the way in makes the existing
-    index sufficient and stores the form a depot would actually write.
-    """
-    return " ".join(value.split()).upper()
+from app.schemas.text import Collapsed, Stripped
 
 
 class VehicleSort(StrEnum):
@@ -36,22 +28,17 @@ class SortOrder(StrEnum):
 
 
 class VehicleCreate(BaseModel):
-    registration_number: str = Field(min_length=1, max_length=32)
-    make: str = Field(min_length=1, max_length=64)
-    model: str = Field(min_length=1, max_length=64)
+    registration_number: Collapsed = Field(min_length=1, max_length=32)
+    make: Stripped = Field(min_length=1, max_length=64)
+    model: Stripped = Field(min_length=1, max_length=64)
     current_odometer: int = Field(ge=0)
     service_date_interval: int = Field(gt=0, description="Days between services")
     service_mileage_interval: int = Field(gt=0, description="Miles between services")
 
     @field_validator("registration_number")
     @classmethod
-    def normalise(cls, value: str) -> str:
-        return normalise_registration(value)
-
-    @field_validator("make", "model")
-    @classmethod
-    def strip(cls, value: str) -> str:
-        return value.strip()
+    def uppercase(cls, value: str) -> str:
+        return value.upper()
 
 
 class VehicleUpdate(BaseModel):
@@ -61,22 +48,17 @@ class VehicleUpdate(BaseModel):
     so that the transition is checked rather than assigned.
     """
 
-    registration_number: str | None = Field(default=None, min_length=1, max_length=32)
-    make: str | None = Field(default=None, min_length=1, max_length=64)
-    model: str | None = Field(default=None, min_length=1, max_length=64)
+    registration_number: Collapsed | None = Field(default=None, min_length=1, max_length=32)
+    make: Stripped | None = Field(default=None, min_length=1, max_length=64)
+    model: Stripped | None = Field(default=None, min_length=1, max_length=64)
     current_odometer: int | None = Field(default=None, ge=0)
     service_date_interval: int | None = Field(default=None, gt=0)
     service_mileage_interval: int | None = Field(default=None, gt=0)
 
     @field_validator("registration_number")
     @classmethod
-    def normalise(cls, value: str | None) -> str | None:
-        return normalise_registration(value) if value is not None else None
-
-    @field_validator("make", "model")
-    @classmethod
-    def strip(cls, value: str | None) -> str | None:
-        return value.strip() if value is not None else None
+    def uppercase(cls, value: str | None) -> str | None:
+        return value.upper() if value is not None else None
 
 
 class VehicleRead(BaseModel):

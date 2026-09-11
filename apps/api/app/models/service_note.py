@@ -1,9 +1,10 @@
 """Service notes. Append-only: no updated_at, and no update or delete path."""
 
 from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
+from app.models.user import User
 from app.models.mixins import CreatedAtMixin, IdMixin
 
 
@@ -27,3 +28,5 @@ class ServiceNote(IdMixin, CreatedAtMixin, Base):
         nullable=False,
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
+
+    author: Mapped["User"] = relationship(lazy="raise_on_sql")

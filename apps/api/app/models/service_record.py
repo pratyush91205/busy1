@@ -13,9 +13,11 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
+from app.models.user import User
+from app.models.vehicle import Vehicle
 from app.models.enums import ServiceStatus, sql_in
 from app.models.mixins import IdMixin, TimestampMixin
 
@@ -61,3 +63,13 @@ class ServiceRecord(IdMixin, TimestampMixin, Base):
     # Completion data. The odometer here starts the next cycle's mileage count.
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completion_odometer: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Loaded eagerly wherever a service is serialised: a list of 20 records
+    # each lazy-loading its vehicle and technicians is 41 queries. The read
+    # paths use selectinload explicitly; these declare the shape.
+    vehicle: Mapped["Vehicle"] = relationship(lazy="raise_on_sql")
+    technicians: Mapped[list["User"]] = relationship(
+        secondary="service_technicians",
+        order_by="User.full_name",
+        lazy="raise_on_sql",
+    )

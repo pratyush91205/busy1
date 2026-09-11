@@ -7,9 +7,10 @@ restriction holds for a Fleet Manager, for the ORM, and for a psql prompt.
 
 from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
+from app.models.user import User
 from app.models.enums import AuditEventType, sql_in
 from app.models.mixins import CreatedAtMixin, IdMixin
 
@@ -39,3 +40,5 @@ class AuditEvent(IdMixin, CreatedAtMixin, Base):
     new_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     # "metadata" is reserved by SQLAlchemy's declarative base.
     event_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+    actor: Mapped["User | None"] = relationship(lazy="raise_on_sql")
