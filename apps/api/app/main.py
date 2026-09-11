@@ -32,6 +32,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title="Fleet Maintenance API", version="0.1.0")
 
+    # Routes read settings off the app rather than the process-wide cache,
+    # so the settings passed here are the ones actually used - including the
+    # key tokens are verified against.
+    app.state.settings = settings
+
     # Only the configured origins are allowed. The settings validator rejects
     # "*", so a wildcard can never be combined with credentialed requests.
     app.add_middleware(
