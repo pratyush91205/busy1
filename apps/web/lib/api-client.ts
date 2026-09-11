@@ -4,7 +4,12 @@
  * The base URL comes from NEXT_PUBLIC_API_BASE_URL so that a component never
  * hard-codes a host, and failures carry their HTTP status so the UI can tell
  * "nothing there yet" (404) apart from "something is broken" (everything else).
+ *
+ * It also attaches the bearer token when there is one. Authorization remains
+ * entirely the server's decision; this only carries the claim to it.
  */
+
+import { clearToken, readToken } from "@/lib/auth";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -46,12 +51,17 @@ export function configuredApiBaseUrl(): string | null {
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${apiBaseUrl()}${path}`;
+  const token = readToken();
 
   let response: Response;
   try {
     response = await fetch(url, {
       ...init,
-      headers: { Accept: "application/json", ...init?.headers },
+      headers: {
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...init?.headers,
+      },
     });
   } catch (cause) {
     // A network-level failure has no status code; 0 says so honestly.
@@ -59,6 +69,15 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   }
 
   if (!response.ok) {
+    // A 401 on a request that carried a token means the session is over -
+    // expired, revoked, or the user deleted. Drop it, and the authenticated
+    // shell sends the browser to /login.
+    //
+    // Only when a token was actually sent: the 401 from POST /auth/login is a
+    // wrong password, and must stay a form error rather than a logout.
+    if (response.status === 401 && token) {
+      clearToken();
+    }
     throw new ApiError(response.status, await errorMessage(response));
   }
 
