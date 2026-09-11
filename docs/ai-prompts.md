@@ -315,3 +315,37 @@ Downloaded the export and read it: correct header row, `attachment` disposition,
 `text/csv`, ISO-8601 UTC timestamps, two technicians in one cell, and the
 derived overdue column reading `yes` for the record that had been aged past the
 grace period.
+
+## Dashboard and seed data
+
+### Prompt
+
+The dashboard spec, with the UTC week definition settled up front rather than
+left to the implementation — it's the part of this brief most easily got wrong.
+
+### What you got
+
+Close to right. The aggregate queries came out as counts rather than
+row-loading, and importing the due and overdue predicates instead of rewriting
+them was the right instinct.
+
+Two rough edges: local imports scattered inside functions to dodge a circular
+dependency that didn't exist, and a Recharts tooltip formatter typed too
+narrowly to compile.
+
+### What you corrected
+
+Hoisted the imports to the top where they belong.
+
+Added the test I actually wanted, which the spec had only implied: assert the
+dashboard's overdue count *equals* `GET /alerts/count`, rather than asserting
+each is 1. Two numbers over one idea drift; equality catches that and separate
+correctness checks don't.
+
+### Verified rather than trusted
+
+Seeded a demo fleet and read the dashboard back: 11 live vehicles and 1
+archived, 2 due, 1 overdue, 1 in service, 1 completed this week, all four
+statuses populated, all four technicians with work, and six of eight weeks
+non-zero. The alert badge returned the same 1 the overdue tile did — the
+dismissed second overdue record correctly absent from both.

@@ -13,7 +13,8 @@ Two hours a day, one phase each, specced in `.claude/specs/` before being built.
 | 5 | Service records, lifecycle, audit | 3h 00 | 3h 20 |
 | 6 | Due, overdue and alerts | 2h 00 | 2h 30 |
 | 7 | Bulk odometer upload and export | 2h 00 | 2h 00 |
-| | Total | 14h 00 | 16h 05 |
+| 8 | Dashboard and seed data | 2h 00 | 2h 00 |
+| | Total | 16h 00 | 18h 05 |
 
 ## Order
 
@@ -88,7 +89,7 @@ If time runs short: Playwright tests go first, then UI polish, then CSV export
 conveniences. Not cut: authorization, lifecycle validation, due/overdue
 correctness, audit trail, per-row bulk reporting.
 
-Over the 12-hour estimate by about four hours. The overrun is mostly two
+Over the 12-hour estimate by about six hours. The overrun is mostly two
 things: a schema change mid-spec in session 6, and the size of session 5 —
 records, assignment, lifecycle and audit had to be one piece because every
 mutation writes its audit event in the same transaction.

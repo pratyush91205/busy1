@@ -58,7 +58,20 @@ convenience — bypassing it gets a screen of 401s.
 Built so far: `GET /health`, which runs `SELECT 1` and returns 503 if the
 database doesn't answer; `POST /auth/login` and `GET /auth/me`; the six
 vehicle routes; ten service routes; `GET /technicians`; three alert routes;
-the odometer upload; and the CSV export.
+the odometer upload; the CSV export; and `GET /dashboard`.
+
+## The dashboard
+
+One endpoint, six aggregate queries, all counted by PostgreSQL. It imports
+the due and overdue predicates rather than rewriting them, and a test
+asserts the overdue tile equals the alert badge — two queries over one idea
+will otherwise drift, and a manager can't tell which is lying.
+
+Weeks are ISO-8601 in UTC. `date_trunc('week')` is already ISO in
+PostgreSQL, so the bucketing is one SQL expression rather than Python date
+arithmetic. The service layer fills in the gaps the database can't return:
+a status with no records, a week with no completions, a technician with
+nothing assigned. Each has to be a zero rather than absent.
 
 ## CSV in and out
 

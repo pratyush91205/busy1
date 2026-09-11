@@ -228,3 +228,31 @@
   stops the export being the first endpoint to fall over as data grows. The
   brief also calls out building reports in the browser as the thing not to do,
   and streaming makes that impossible rather than merely avoided.
+
+## Decision 24
+
+- **Chose:** one `/dashboard` endpoint returning the whole summary.
+- **Rejected:** one endpoint per figure.
+- **Why:** the dashboard is one screen. Six round trips is six chances for a
+  half-drawn answer, and the queries are all indexed counts. Trade-off: no
+  partial refresh — the whole summary reloads or none of it does.
+
+## Decision 25
+
+- **Chose:** the dashboard imports the due and overdue predicates rather than
+  rewriting them, and a test asserts the overdue tile equals the alert badge.
+- **Rejected:** writing the aggregate queries independently.
+- **Why:** two queries over one idea will drift, and when the tile and the
+  badge disagree a manager has no way to tell which is lying. Asserting they're
+  *equal* catches that; asserting each is correct separately would not.
+
+## Decision 26
+
+- **Chose:** the seed script drives the service layer.
+- **Rejected:** inserting demo rows with SQL.
+- **Why:** the demo data then obeys every rule the app does, and cycle numbers,
+  baselines and audit timelines come out right without being reproduced by
+  hand. A broken rule fails the seed loudly instead of producing data the UI
+  can't explain. Trade-off: backdating completions can't go through the service
+  layer — the rules are about the present — so those timestamps are written
+  directly, the one hand-written exception, and it's commented where it happens.
