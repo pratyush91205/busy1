@@ -1,17 +1,26 @@
-import { ApiStatusCard } from "@/components/api-status-card";
+"use client";
 
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+
+import { useCurrentUser } from "@/hooks/use-auth";
+
+/** Sends the visitor wherever their session says they belong. */
 export default function Home() {
-  return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-10">
-      <header className="space-y-1">
-        <h1 className="text-lg font-semibold">Fleet Maintenance</h1>
-        <p className="text-sm text-muted-foreground">
-          The domain schema is in place. Sign-in and the fleet pages arrive with
-          Phase 4; until then this card confirms the API can reach PostgreSQL.
-        </p>
-      </header>
+  const router = useRouter();
+  const { user, isLoading } = useCurrentUser();
 
-      <ApiStatusCard />
-    </main>
+  useEffect(() => {
+    if (isLoading) return;
+    router.replace(user ? "/dashboard" : "/login");
+  }, [isLoading, user, router]);
+
+  return (
+    <output
+      aria-live="polite"
+      className="text-muted-foreground flex min-h-full items-center justify-center text-sm"
+    >
+      Loading…
+    </output>
   );
 }
