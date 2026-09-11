@@ -14,8 +14,27 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.router import api_router
 from app.core.config import Settings, get_settings
+from app.services.errors import DomainError
 
 logger = logging.getLogger(__name__)
+
+
+async def handle_domain_error(request: Request, exc: Exception) -> JSONResponse:
+    """Turn a service-layer rule refusal into its HTTP status.
+
+    This is what lets the service layer stay free of FastAPI: a rule raises
+    ConflictError, and the shape of the 409 is decided in one place rather than
+    in every route's except block.
+    """
+    assert isinstance(exc, DomainError)
+    logger.info(
+        "%s on %s %s: %s",
+        type(exc).__name__,
+        request.method,
+        request.url.path,
+        exc.message,
+    )
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
 
 
 async def handle_database_error(request: Request, exc: Exception) -> JSONResponse:
@@ -47,6 +66,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
 
+    app.add_exception_handler(DomainError, handle_domain_error)
     app.add_exception_handler(SQLAlchemyError, handle_database_error)
     app.include_router(api_router)
     return app
