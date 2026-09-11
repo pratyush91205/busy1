@@ -407,7 +407,15 @@ def test_the_page_size_is_capped(api: TestClient, manager: dict[str, str]) -> No
 
 
 def test_no_route_deletes_a_vehicle(api: TestClient) -> None:
-    """Rule 9. Archive is the only removal."""
-    paths = api.app.openapi()["paths"]  # type: ignore[attr-defined]
+    """Rule 9. Archive is the only removal, so a vehicle row is never dropped.
 
-    assert not any("delete" in methods for methods in paths.values())
+    Scoped to /vehicles rather than the whole document: unassigning a
+    technician is a DELETE, and rightly so - that removes a link, not history.
+    """
+    paths = api.app.openapi()["paths"]  # type: ignore[attr-defined]
+    vehicle_paths = {
+        path: methods for path, methods in paths.items() if path.startswith("/vehicles")
+    }
+
+    assert vehicle_paths, "the vehicle routes should be registered"
+    assert not any("delete" in methods for methods in vehicle_paths.values())
