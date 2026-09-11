@@ -14,6 +14,7 @@ const LINKS = [
   { href: "/vehicles", label: "Vehicles", managerOnly: false },
   { href: "/services", label: "Services", managerOnly: false },
   { href: "/alerts", label: "Alerts", managerOnly: true },
+  { href: "/reports", label: "Reports", managerOnly: true },
 ];
 
 export function AppHeader({ user }: { user: User }) {
