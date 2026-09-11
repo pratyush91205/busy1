@@ -31,7 +31,10 @@ current status other than `in_service` with 409, write `completed_at` and
 actor, close out the cycle's overdue state → commit, or roll all of it back.
 
 The rollback is the point: a service can't be completed with no audit event to
-show for it.
+show for it. `audit_repository.record` adds to the session and never commits,
+so that property belongs to the API rather than to each caller remembering.
+A test installs a trigger that makes the audit insert fail and asserts the
+status change goes with it.
 
 ## Authentication
 
@@ -53,8 +56,20 @@ The browser keeps the token in `localStorage` and reads the user from
 convenience — bypassing it gets a screen of 401s.
 
 Built so far: `GET /health`, which runs `SELECT 1` and returns 503 if the
-database doesn't answer; `POST /auth/login` and `GET /auth/me`; and the six
-vehicle routes.
+database doesn't answer; `POST /auth/login` and `GET /auth/me`; the six
+vehicle routes; ten service routes; and `GET /technicians`.
+
+## Two kinds of authorization
+
+`require_role("fleet_manager")` is a route dependency and answers "what is
+this user". It cannot answer "is this record theirs", which is per-resource
+and lives in the service layer: a technician sees only records they are
+assigned to, and one they aren't gets 404 rather than 403.
+
+Some rules need both. An assigned technician may start and complete a
+service — that is the work — but booking sets the schedule and stays a
+manager's. So the transition endpoint has no role dependency at all; the
+check depends on which move is being asked for.
 
 ## Listing
 

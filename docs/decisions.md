@@ -127,3 +127,40 @@
   `HTTPException` can't be tested without a request. Routes end up with no
   try/except and the shape of a 409 is decided once. Trade-off: one more
   indirection between raising and the response.
+
+## Decision 14
+
+- **Chose:** a vehicle may have at most one open service record.
+- **Rejected:** any number of concurrent open cycles.
+- **Why:** "the current service cycle" has to mean something for due and
+  overdue to be computable at all, and one record is one cycle. It also makes
+  alert dismissal cycle-scoped for free. Trade-off: a fleet that services a
+  vehicle twice at once can't be modelled — not something a logistics fleet
+  does, but it is an invented constraint and worth owning.
+
+## Decision 15
+
+- **Chose:** one `POST /services/{id}/transition` taking the target status.
+- **Rejected:** `/book`, `/start`, `/complete`.
+- **Why:** the transition table stays in one function instead of being spread
+  across three handlers, and adding a status later adds no route. Trade-off:
+  the body carries `scheduled_date` and `completion_odometer`, each required by
+  exactly one target, which is validated per target rather than by the schema.
+
+## Decision 16
+
+- **Chose:** a technician reading a record they aren't assigned to gets 404.
+- **Rejected:** 403, which is the literal truth.
+- **Why:** 403 confirms the id exists, so walking the ids maps the whole fleet.
+  404 says nothing. Trade-off: a technician who really was assigned a second
+  ago sees a confusing "no such record" rather than "not yours".
+
+## Decision 17
+
+- **Chose:** the description endpoint takes a description and nothing else,
+  and rejects any other field outright.
+- **Rejected:** accepting a wider body and ignoring the fields not allowed.
+- **Why:** an assigned technician may edit a description. If that schema also
+  carried `status` or `technician_ids`, that permission would quietly become
+  the permission to reassign the record or skip the lifecycle. Ignoring extra
+  fields relies on remembering to; not accepting them is structural.

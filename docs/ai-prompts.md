@@ -160,3 +160,59 @@ list hiding archived rows while `include_archived=true` shows them.
 
 That's also how the timezone bug surfaced — `created_at` came back `+05:30`.
 Nothing in the test suite compared a timestamp, so no test would have found it.
+
+## Service records, lifecycle and audit
+
+### Prompt
+
+One spec covering records, assignment, lifecycle and audit together, then
+"implement it". Specced as one piece deliberately: every mutation has to write
+its audit event in the same transaction, so building the mutations first and
+the audit trail afterwards means writing them twice.
+
+### What you got
+
+The lifecycle table and the transaction handling came out right. Three things
+did not.
+
+A whitespace-only description passed `min_length=1`, stripped to empty in the
+service layer, and hit the database's not-blank constraint — a 503 where a 422
+belonged.
+
+The vehicle test asserting "no DELETE route exists anywhere" started failing
+the moment unassigning a technician was added. The rule was right; the test was
+written too wide.
+
+And a `queryClientRef` module-level variable in the service hooks, which is
+shared mutable state across renders.
+
+### What you corrected
+
+Stripping moved into a `BeforeValidator` so it runs before the length check.
+The constraint stays the guarantee, the schema becomes the readable rejection.
+
+Narrowed the DELETE test to `/vehicles` paths, with a comment saying why
+unassignment is legitimately a DELETE.
+
+Replaced the module-level query client with `useQueryClient()` in the hook.
+
+### The mistake that wasn't a bug
+
+Ran a second pytest process while the first was still going, both against the
+same test database. Twenty-odd failures that read like a fixture-ordering
+disaster — duplicate keys and vanished users at the same time. Nothing was
+wrong with the code. Worth remembering that contradictory failures usually mean
+the test environment, not the test.
+
+### Verified rather than trusted
+
+Drove the whole workflow against the local database: create vehicle, open a
+record, refuse a second open record on the same vehicle, assign, refuse a
+technician assigning, refuse Due → Completed, refuse a technician booking,
+book, start, note, refuse a completion below the vehicle's odometer, complete,
+confirm the odometer moved and `due_since` cleared, open cycle 2, and read the
+timeline back — six events, each with the right actor.
+
+The transition table is tested exhaustively rather than by example: all sixteen
+ordered pairs, three allowed and thirteen refused. Three happy-path tests would
+pass equally well against a service layer that allowed everything.

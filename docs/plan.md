@@ -10,7 +10,8 @@ Two hours a day, one phase each, specced in `.claude/specs/` before being built.
 | 2 | Database schema and migrations | 1h 00 | 1h 30 |
 | 3 | Authentication and authorization | 2h 00 | 2h 15 |
 | 4 | Vehicle management | 2h 00 | 2h 10 |
-| | Total | 7h 00 | 8h 15 |
+| 5 | Service records, lifecycle, audit | 3h 00 | 3h 20 |
+| | Total | 10h 00 | 11h 35 |
 
 ## Order
 
@@ -45,6 +46,17 @@ which documents both parameters properly anyway. Then a curl of a real
 response showed timestamps coming back as `+05:30`: TIMESTAMPTZ stores UTC
 but renders in the session's timezone. Pinned the session to UTC before the
 dashboard's week buckets could inherit the problem.
+
+Session 5, 20 minutes over, and the largest session by far — records,
+assignment, lifecycle and audit specced as one piece because every
+mutation has to write its audit event in the same transaction. Splitting
+them would have meant writing the mutations twice.
+
+Two things cost the time. A whitespace-only description passed
+`min_length=1`, stripped to empty in the service layer and hit the
+database's not-blank constraint as a 503 — fixed by stripping before the
+length check. And I ran two pytest processes against the same test
+database at once and spent a while reading the wreckage as a real bug.
 
 ## Cut
 
