@@ -18,12 +18,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
 from app.api.deps import require_role
-from app.auth.passwords import hash_password
 from app.auth.tokens import ALGORITHM
 from app.main import create_app
 from app.models import User
 
 from .conftest import build_test_settings, client_for
+from .helpers import PASSWORD, auth_header, create_user
 
 SECRET = build_test_settings().jwt_secret
 OTHER_SECRET = "a-completely-different-signing-key"
@@ -32,7 +32,6 @@ HOUR_AHEAD = datetime.now(UTC) + timedelta(hours=1)
 
 MANAGER_EMAIL = "manager@fleet.example"
 TECHNICIAN_EMAIL = "tech@fleet.example"
-PASSWORD = "correct-horse-battery-staple"
 
 
 @pytest.fixture
@@ -131,7 +130,7 @@ def test_a_malformed_body_is_unprocessable_not_unauthorized(
 def test_me_returns_the_signed_in_users_public_fields(
     db_client: TestClient, technician_id: int
 ) -> None:
-    response = db_client.get("/auth/me", headers=bearer(db_client, TECHNICIAN_EMAIL))
+    response = db_client.get("/auth/me", headers=auth_header(db_client, TECHNICIAN_EMAIL))
 
     assert response.status_code == 200
     assert response.json() == {
@@ -181,7 +180,7 @@ def test_a_token_for_a_deleted_user_is_unauthorized_not_an_error(
     db_client: TestClient, clean_db: Engine, technician_id: int
 ) -> None:
     """Rule 5."""
-    headers = bearer(db_client, TECHNICIAN_EMAIL)
+    headers = auth_header(db_client, TECHNICIAN_EMAIL)
     with clean_db.begin() as connection:
         connection.execute(
             text("DELETE FROM users WHERE id = :id"), {"id": technician_id}
@@ -201,7 +200,7 @@ def test_require_role_admits_the_named_role(
 ) -> None:
     """Rule 6."""
     response = role_client.get(
-        "/managers-only", headers=bearer(role_client, MANAGER_EMAIL)
+        "/managers-only", headers=auth_header(role_client, MANAGER_EMAIL)
     )
 
     assert response.status_code == 200
@@ -213,7 +212,7 @@ def test_require_role_refuses_every_other_role(
 ) -> None:
     """Rule 6."""
     response = role_client.get(
-        "/managers-only", headers=bearer(role_client, TECHNICIAN_EMAIL)
+        "/managers-only", headers=auth_header(role_client, TECHNICIAN_EMAIL)
     )
 
     assert response.status_code == 403
@@ -299,27 +298,3 @@ def role_client(clean_db: Engine) -> Iterator[TestClient]:
 
     with client_for(app, clean_db) as test_client:
         yield test_client
-
-
-def create_user(engine: Engine, email: str, name: str, role: str) -> int:
-    """Insert a user with a real bcrypt hash of PASSWORD."""
-    with engine.begin() as connection:
-        return connection.execute(
-            text(
-                "INSERT INTO users (email, full_name, password_hash, role) "
-                "VALUES (:email, :name, :hash, :role) RETURNING id"
-            ),
-            {
-                "email": email,
-                "name": name,
-                "hash": hash_password(PASSWORD),
-                "role": role,
-            },
-        ).scalar_one()
-
-
-def bearer(client: TestClient, email: str) -> dict[str, str]:
-    """Log in and return the Authorization header for that user."""
-    response = client.post("/auth/login", json={"email": email, "password": PASSWORD})
-    assert response.status_code == 200, response.text
-    return {"Authorization": f"Bearer {response.json()['access_token']}"}
