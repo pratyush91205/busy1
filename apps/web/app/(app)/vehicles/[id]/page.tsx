@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
+import { VehicleServiceHistory } from "@/components/vehicles/service-history";
 import { VehicleFormModal } from "@/components/vehicles/vehicle-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -114,13 +115,7 @@ export default function VehicleDetailPage() {
         </Card>
       </div>
 
-      <section className="space-y-2">
-        <h2 className="text-sm font-semibold">Service history</h2>
-        <p className="text-muted-foreground rounded-md border border-dashed px-4 py-8 text-center text-sm">
-          Service records arrive with the next phase. Archiving a vehicle keeps
-          its history, so nothing shown here is ever deleted.
-        </p>
-      </section>
+      <VehicleServiceHistory vehicleId={id} />
 
       <VehicleFormModal
         open={editing}

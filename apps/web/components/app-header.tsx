@@ -11,6 +11,7 @@ import { ROLE_LABELS, type User } from "@/types/auth";
 const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/vehicles", label: "Vehicles" },
+  { href: "/services", label: "Services" },
 ];
 
 export function AppHeader({ user }: { user: User }) {
