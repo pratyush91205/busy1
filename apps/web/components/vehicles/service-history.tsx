@@ -73,7 +73,7 @@ export function VehicleServiceHistory({ vehicleId }: { vehicleId: number }) {
                     {service.description}
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={service.status} />
+                    <StatusBadge status={service.status} isOverdue={service.is_overdue} />
                   </TableCell>
                   <TableCell className="text-muted-foreground whitespace-nowrap">
                     {service.completed_at

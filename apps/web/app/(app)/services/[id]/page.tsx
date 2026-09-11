@@ -83,7 +83,7 @@ export default function ServiceDetailPage() {
               {service.vehicle.make} {service.vehicle.model}
             </span>
           </h1>
-          <StatusBadge status={service.status} />
+          <StatusBadge status={service.status} isOverdue={service.is_overdue} />
         </div>
 
         <LifecycleSteps status={service.status} />

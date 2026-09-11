@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { useUpdateVehicle, useVehicle } from "@/hooks/use-vehicles";
+import type { Vehicle, VehicleServiceStatus } from "@/types/vehicle";
 
 export default function VehicleDetailPage() {
   const params = useParams<{ id: string }>();
@@ -63,7 +64,11 @@ export default function VehicleDetailPage() {
             <h1 className="text-lg font-semibold">
               {vehicle.registration_number}
             </h1>
-            {vehicle.is_archived ? <Badge tone="neutral">ARCHIVED</Badge> : null}
+            {vehicle.is_archived ? (
+              <Badge tone="neutral">ARCHIVED</Badge>
+            ) : vehicle.service_status?.is_due ? (
+              <Badge tone="warning">DUE</Badge>
+            ) : null}
           </div>
           <p className="text-muted-foreground text-sm">
             {vehicle.make} {vehicle.model}
@@ -115,6 +120,8 @@ export default function VehicleDetailPage() {
         </Card>
       </div>
 
+      <NextServiceCard vehicle={vehicle} />
+
       <VehicleServiceHistory vehicleId={id} />
 
       <VehicleFormModal
@@ -132,4 +139,64 @@ export default function VehicleDetailPage() {
       />
     </main>
   );
+}
+
+function NextServiceCard({ vehicle }: { vehicle: Vehicle }) {
+  const status = vehicle.service_status;
+  if (!status) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm font-medium">Next service</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        {vehicle.is_archived ? (
+          <p className="text-muted-foreground">
+            Archived vehicles are not in service, so they never become due.
+          </p>
+        ) : status.is_due ? (
+          <p className="font-medium text-amber-700 dark:text-amber-300">
+            Due now — {explain(status.reason)}.
+          </p>
+        ) : (
+          <p>Not due yet.</p>
+        )}
+
+        <dl className="text-muted-foreground grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 text-xs">
+          <dt>Due on or after</dt>
+          <dd className="tabular-nums">{status.next_due_date}</dd>
+          <dt>Or at odometer</dt>
+          <dd className="tabular-nums">
+            {status.next_due_odometer.toLocaleString()} mi
+          </dd>
+          <dt>Counting from</dt>
+          <dd className="tabular-nums">
+            {vehicle.service_baseline_date} ·{" "}
+            {vehicle.service_baseline_odometer.toLocaleString()} mi
+          </dd>
+        </dl>
+
+        {status.has_open_record ? (
+          <p className="text-muted-foreground text-xs">
+            A service record is already open for this vehicle.
+          </p>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Either interval makes a vehicle due; they are not required together. */
+function explain(reason: VehicleServiceStatus["reason"]): string {
+  switch (reason) {
+    case "date":
+      return "the date interval has been reached";
+    case "mileage":
+      return "the mileage interval has been reached";
+    case "both":
+      return "both intervals have been reached";
+    default:
+      return "";
+  }
 }

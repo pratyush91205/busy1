@@ -177,7 +177,7 @@ function ServicesView() {
                     {service.description}
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={service.status} />
+                    <StatusBadge status={service.status} isOverdue={service.is_overdue} />
                   </TableCell>
                   <TableCell className="text-muted-foreground whitespace-nowrap tabular-nums">
                     {service.scheduled_date ?? "—"}

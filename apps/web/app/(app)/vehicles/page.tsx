@@ -57,6 +57,7 @@ function VehiclesView() {
   const query = {
     search: params.get("search") ?? "",
     include_archived: params.get("archived") === "true",
+    due: params.get("due") === "true" ? true : undefined,
     sort: (params.get("sort") as VehicleSort) || "registration_number",
     order: params.get("order") === "desc" ? ("desc" as const) : ("asc" as const),
     page: Number(params.get("page")) || 1,
@@ -110,6 +111,18 @@ function VehiclesView() {
           className="max-w-xs"
           aria-label="Search vehicles"
         />
+
+        <label className="text-muted-foreground flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={query.due === true}
+            onChange={(event) =>
+              setParam({ due: event.target.checked ? "true" : null })
+            }
+            className="size-4"
+          />
+          Due only
+        </label>
 
         <label className="text-muted-foreground flex items-center gap-2 text-sm">
           <input
@@ -200,8 +213,11 @@ function VehiclesView() {
                     {vehicle.service_mileage_interval.toLocaleString()} mi
                   </TableCell>
                   <TableCell>
+                    {/* Archived wins: an archived vehicle is never due. */}
                     {vehicle.is_archived ? (
                       <Badge tone="neutral">ARCHIVED</Badge>
+                    ) : vehicle.service_status?.is_due ? (
+                      <Badge tone="warning">DUE</Badge>
                     ) : (
                       <Badge tone="success">ACTIVE</Badge>
                     )}
