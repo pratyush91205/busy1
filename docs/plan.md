@@ -2,50 +2,43 @@
 
 ## Sessions
 
-Two hours a day, one phase per session, each phase written up as a spec in
-`.claude/specs/` before it's built.
+Two hours a day, one phase each, specced in `.claude/specs/` before being built.
 
 | # | Session | Estimated | Actual |
 |---|---|---|---|
 | 1 | Repo setup and walking skeleton | 2h 00 | 2h 20 |
 | 2 | Database schema and migrations | 1h 00 | 1h 30 |
-| | Total so far | 3h 00 | 3h 50 |
+| | Total | 3h 00 | 3h 50 |
 
-## Order, and why
+## Order
 
-Repository shape first, because the project was sitting a directory below the
-git root inside an unrelated repo, and fixing that later would have meant
-rewriting history. Then the walking skeleton, which satisfies no goal but
-everything depends on. Then the schema, all seven tables in one migration
-including `audit_events` and the cycle identifier. Authentication comes next,
-because the rest of the system is defined by what each role may do.
+Repository shape first — the project sat below the git root in an unrelated
+repo, and fixing that later means rewriting history. Then the walking skeleton,
+which satisfies no goal but everything depends on. Then the schema, all seven
+tables in one migration. Authentication next, because the rest of the system is
+defined by what each role may do.
 
-Tests go in the same session as the rule they cover. No testing phase at the
-end — the lifecycle and authorization tests are the ones that matter, and
-they'd be first to go if left to last.
+Tests go in the session that introduces the rule. No testing phase at the end;
+that's where lifecycle and authorization tests go to die.
 
 ## Estimates versus actuals
 
-Session 1 ran 20 minutes over, all of it on the shadcn CLI, whose `init` now
-either scaffolds a new project or silently does nothing in an existing one. I
-wrote the four files it would have generated instead.
+Session 1, 20 minutes over: the shadcn CLI's `init` now scaffolds a new project
+or does nothing, so I wrote the four files it would have generated.
 
-Session 2 ran 30 minutes over getting PostgreSQL running locally. The winget
-package installed `bin/` without `lib/`, so `initdb` failed on a missing
-library and there was no cluster at all. Switched to the standalone binaries
-archive. Writing the schema itself was quick, because the spec had already
-settled the awkward parts.
+Session 2, 30 minutes over: the winget PostgreSQL package installed `bin/`
+without `lib/`, so `initdb` failed and there was no cluster. Switched to the
+standalone binaries. The schema itself was quick — the spec had settled the
+awkward parts already.
 
-## Cut, and moved
+## Cut
 
-Nothing cut from the ten goals yet.
+Nothing cut from the ten goals.
 
-Deployment moved. It was planned as phase 2, on the reasoning that finding a
-broken pipeline at hour 11 is how this fails. I moved it to the end of the build
-— trade-off in `decisions.md`. What's already done for it: `render.yaml` is
-committed, config is entirely environment-driven, no hard-coded hosts.
+Deployment moved from phase 2 to the end of the build (trade-off in
+`decisions.md`). Already done for it: `render.yaml`, environment-driven config,
+no hard-coded hosts.
 
-If time runs short, the cut order is Playwright tests, then UI polish, then CSV
-export conveniences while keeping the export. Not cut: server-side
-authorization, lifecycle validation, due/overdue correctness, the audit trail,
-per-row bulk reporting.
+If time runs short: Playwright tests go first, then UI polish, then CSV export
+conveniences. Not cut: authorization, lifecycle validation, due/overdue
+correctness, audit trail, per-row bulk reporting.

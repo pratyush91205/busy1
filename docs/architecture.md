@@ -2,57 +2,45 @@
 
 ## The pieces
 
-**`apps/web`** — Next.js 16 (App Router), TypeScript, Tailwind, TanStack Query.
-No business rules. It asks the API questions and renders four states for every
-answer: loading, error, empty, success.
+- **apps/web** — Next.js 16 App Router, TypeScript, Tailwind, TanStack Query.
+  No business rules; renders loading, error, empty and success for every answer.
+- **apps/api** — FastAPI, Python 3.13, SQLAlchemy 2, Alembic. All rules live
+  here, layered route → service → repository → database.
+- **PostgreSQL 17** — data, plus constraints and the triggers that keep
+  `audit_events` append-only.
 
-**`apps/api`** — FastAPI on Python 3.13, SQLAlchemy 2, Alembic. All the rules
-live here, layered route → service → repository → database.
+JSON over HTTPS between browser and API, a connection pool between API and
+database. No queue, cache or worker: maintenance state is computed from the data
+and the clock, so nothing needs keeping warm.
 
-**PostgreSQL 17** — the data, plus a share of the correctness: unique and check
-constraints, foreign keys, and triggers making the audit table append-only.
+## Where each runs
 
-Browser to API is JSON over HTTPS. API to database is a connection pool. No
-queue, no cache, no background worker, and I'd like to keep it that way:
-maintenance state is computed from the data and the current time, so nothing has
-to be kept warm by a job.
+Locally for now — a local Postgres cluster, uvicorn, `next dev`. Production is
+meant to be Supabase, Render and Vercel; `render.yaml` is committed, all config
+is environment-driven, no hard-coded hosts. Not deployed yet (see
+`decisions.md`).
 
-## Where it runs
+## Request path: completing a service
 
-Locally, for now — Postgres as a local cluster, the API under uvicorn, the
-frontend under `next dev`.
+`POST /services/{id}/complete` with a bearer token →
+`get_db` opens a session and `require_role("fleet_manager")` decodes the token
+and re-reads the user from the database, so a tampered role claim gets 403 →
+the route calls one service-layer function → in one transaction: reject any
+current status other than `in_service` with 409, write `completed_at` and
+`completion_odometer`, append a `status_changed` audit event with old, new and
+actor, close out the cycle's overdue state → commit, or roll all of it back.
 
-The intended production layout is Supabase, Render and Vercel. `render.yaml` is
-committed, every setting comes from environment variables, and no host is
-hard-coded in the frontend. Deployment hasn't happened yet; the reasoning and
-the risk are in `decisions.md`.
+The rollback is the point: a service can't be completed with no audit event to
+show for it.
 
-## One request: completing a service
+Only `GET /health` exists so far. It runs `SELECT 1` and returns 503 if the
+database doesn't answer.
 
-1. Browser sends `POST /services/{id}/complete` with a bearer token.
-2. Dependencies resolve: `get_db` opens a session, `require_role("fleet_manager")`
-   decodes the token and re-reads the user from the database. The role claim in
-   the token isn't trusted for the decision, so a role change takes effect on
-   the next request rather than the next login. Wrong role is 403.
-3. The route calls one service-layer function and does nothing else.
-4. In one transaction: check the current status is `in_service` (anything else
-   is 409, naming both states), write `completed_at` and `completion_odometer`,
-   append a `status_changed` audit event with old value, new value and actor,
-   and close out the cycle's overdue state.
-5. Commit, or roll all of it back. That's what stops a service being completed
-   with no audit event to show for it.
+## Not built
 
-Today the only endpoint that exists is `GET /health`, which runs `SELECT 1` and
-returns 503 if the database doesn't answer.
-
-## Not built, on purpose
-
-- **Refresh tokens.** 12-hour access token, then log in again.
-- **A signup endpoint.** Users are seeded. An endpoint that accepted a role
-  would undermine the authorization model.
-- **Login rate limiting.** Needs shared state to be worth anything, and there
-  isn't any on a free tier.
-- **An odometer history table** and **stored overdue alerts** — see
-  `decisions.md`.
-- **Any background scheduler.** Maintenance state must be derivable from the
-  database and the clock.
+- Refresh tokens — 12-hour access token, then log in again.
+- A signup endpoint — users are seeded; one accepting a role would undermine
+  the authorization model.
+- Login rate limiting — needs shared state, which a free tier doesn't have.
+- Odometer history and stored overdue alerts — see `decisions.md`.
+- Any scheduler. Maintenance state must follow from the database and the clock.
