@@ -1,14 +1,20 @@
 @import "tailwindcss";
 
 /* Design tokens in the shadcn/ui neutral palette, so components added with
-   `npx shadcn add <component>` in later phases inherit the same theme. */
+   `npx shadcn add <component>` inherit the same theme.
+
+   On top of that sits a second, smaller palette: one colour per maintenance
+   state. Those five are the only colours in the application that mean
+   anything, which is what keeps a status legible at a glance in a dense
+   table. Everything else is neutral. */
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --radius: 0.5rem;
+  /* Modest, so a table of bordered cells does not read as a pile of pills. */
+  --radius: 0.375rem;
 
-  --background: oklch(1 0 0);
+  --background: oklch(0.995 0 0);
   --foreground: oklch(0.145 0 0);
 
   --card: oklch(1 0 0);
@@ -24,24 +30,42 @@
   --secondary-foreground: oklch(0.205 0 0);
 
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  --muted-foreground: oklch(0.505 0 0);
 
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
 
-  --destructive: oklch(0.577 0.245 27.325);
+  --destructive: oklch(0.552 0.211 27.325);
   --destructive-foreground: oklch(0.985 0 0);
 
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: oklch(0.916 0 0);
+  --input: oklch(0.916 0 0);
+  --ring: oklch(0.58 0 0);
+
+  /* The surface a table header or a toolbar sits on: one step off the page,
+     never a shadow. */
+  --subtle: oklch(0.975 0 0);
+
+  /* Maintenance state. `-soft` is the fill, the bare token is the ink and the
+     rule. Overdue is included even though it is not a stored status - it is
+     derived, and it is the one a manager must never miss. */
+  --due: oklch(0.53 0.125 75);
+  --due-soft: oklch(0.962 0.045 85);
+  --overdue: oklch(0.525 0.19 27);
+  --overdue-soft: oklch(0.958 0.035 25);
+  --booked: oklch(0.52 0.14 250);
+  --booked-soft: oklch(0.962 0.03 250);
+  --in-service: oklch(0.5 0.17 291);
+  --in-service-soft: oklch(0.962 0.03 295);
+  --completed: oklch(0.47 0.11 162);
+  --completed-soft: oklch(0.958 0.04 165);
 }
 
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
 
-  --card: oklch(0.205 0 0);
+  --card: oklch(0.185 0 0);
   --card-foreground: oklch(0.985 0 0);
 
   --popover: oklch(0.205 0 0);
@@ -53,8 +77,8 @@
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
 
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
+  --muted: oklch(0.255 0 0);
+  --muted-foreground: oklch(0.715 0 0);
 
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
@@ -62,16 +86,29 @@
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
 
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --border: oklch(1 0 0 / 13%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.6 0 0);
+
+  --subtle: oklch(0.205 0 0);
+
+  --due: oklch(0.83 0.13 85);
+  --due-soft: oklch(0.75 0.13 85 / 14%);
+  --overdue: oklch(0.75 0.16 25);
+  --overdue-soft: oklch(0.7 0.18 25 / 16%);
+  --booked: oklch(0.78 0.11 250);
+  --booked-soft: oklch(0.7 0.13 250 / 16%);
+  --in-service: oklch(0.78 0.12 295);
+  --in-service-soft: oklch(0.7 0.14 295 / 16%);
+  --completed: oklch(0.8 0.12 165);
+  --completed-soft: oklch(0.72 0.13 165 / 14%);
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -92,6 +129,18 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-subtle: var(--subtle);
+
+  --color-due: var(--due);
+  --color-due-soft: var(--due-soft);
+  --color-overdue: var(--overdue);
+  --color-overdue-soft: var(--overdue-soft);
+  --color-booked: var(--booked);
+  --color-booked-soft: var(--booked-soft);
+  --color-in-service: var(--in-service);
+  --color-in-service-soft: var(--in-service-soft);
+  --color-completed: var(--completed);
+  --color-completed-soft: var(--completed-soft);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -99,10 +148,51 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
 
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground font-sans text-sm;
+    /* Operations screens are read at a glance, not scrolled through slowly. */
+    font-feature-settings: "cv05" 1;
+  }
+
+  /* One focus treatment for the whole application, on the keyboard only. */
+  :focus-visible {
+    @apply ring-ring ring-offset-background rounded-sm ring-2 ring-offset-2 outline-none;
+  }
+
+  /* Every figure in this app is a quantity in a column. */
+  th,
+  td {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* Headers that stay put while a long table scrolls inside its frame. */
+  .sticky-head th {
+    @apply bg-subtle sticky top-0 z-10;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

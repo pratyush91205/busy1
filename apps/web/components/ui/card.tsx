@@ -2,12 +2,13 @@ import type { ComponentProps } from "react";
 
 import { cn } from "@/lib/utils";
 
+/** A bordered panel. One border, no shadow - depth is for dialogs. */
 function Card({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       data-slot="card"
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-4 rounded-lg border py-4 shadow-sm",
+        "bg-card text-card-foreground flex flex-col rounded-md border",
         className,
       )}
       {...props}
@@ -19,25 +20,31 @@ function CardHeader({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       data-slot="card-header"
-      className={cn("flex flex-col gap-1 px-4", className)}
+      className={cn(
+        "flex items-center justify-between gap-2 border-b px-4 py-2.5",
+        className,
+      )}
       {...props}
     />
   );
 }
 
-function CardTitle({ className, ...props }: ComponentProps<"div">) {
+function CardTitle({ className, ...props }: ComponentProps<"h2">) {
   return (
-    <div
+    <h2
       data-slot="card-title"
-      className={cn("leading-none font-semibold", className)}
+      className={cn(
+        "text-muted-foreground text-xs font-semibold tracking-wide uppercase",
+        className,
+      )}
       {...props}
     />
   );
 }
 
-function CardDescription({ className, ...props }: ComponentProps<"div">) {
+function CardDescription({ className, ...props }: ComponentProps<"p">) {
   return (
-    <div
+    <p
       data-slot="card-description"
       className={cn("text-muted-foreground text-sm", className)}
       {...props}
@@ -47,7 +54,7 @@ function CardDescription({ className, ...props }: ComponentProps<"div">) {
 
 function CardContent({ className, ...props }: ComponentProps<"div">) {
   return (
-    <div data-slot="card-content" className={cn("px-4", className)} {...props} />
+    <div data-slot="card-content" className={cn("p-4", className)} {...props} />
   );
 }
 
@@ -55,7 +62,7 @@ function CardFooter({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       data-slot="card-footer"
-      className={cn("flex items-center px-4", className)}
+      className={cn("flex items-center border-t px-4 py-2.5", className)}
       {...props}
     />
   );

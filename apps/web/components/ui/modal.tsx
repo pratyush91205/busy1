@@ -48,19 +48,21 @@ export function Modal({
         if (event.target === ref.current) onClose();
       }}
       className={cn(
-        "bg-background text-foreground m-auto w-[calc(100vw-2rem)] max-w-md rounded-lg border p-0 shadow-lg",
-        "backdrop:bg-black/40",
+        "bg-background text-foreground m-auto w-[calc(100vw-2rem)] max-w-md rounded-lg border p-0 shadow-xl",
+        "backdrop:bg-black/50",
         className,
       )}
       aria-labelledby="modal-title"
     >
-      <div className="space-y-4 p-5">
+      <div className="space-y-4 p-4">
         <header className="space-y-1">
-          <h2 id="modal-title" className="text-base font-semibold">
+          <h2 id="modal-title" className="text-sm font-semibold">
             {title}
           </h2>
           {description ? (
-            <p className="text-muted-foreground text-sm">{description}</p>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              {description}
+            </p>
           ) : null}
         </header>
 
