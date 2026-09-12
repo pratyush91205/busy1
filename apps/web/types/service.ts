@@ -81,6 +81,7 @@ export interface ServiceQuery {
   status?: ServiceStatus;
   technician_id?: number;
   sort?: ServiceSort;
+  limit?: number;
   order?: "asc" | "desc";
   page?: number;
 }

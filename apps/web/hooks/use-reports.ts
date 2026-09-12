@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { ApiError, apiBaseUrl, apiFetch } from "@/lib/api-client";
 import { readToken } from "@/lib/auth";
+import { toSearchParams } from "@/lib/query-string";
 import type { ServiceQuery } from "@/types/service";
 
 export interface OdometerRowResult {
@@ -39,6 +40,7 @@ export function useOdometerUpload() {
     onSuccess: () => {
       // Readings change odometers, which changes which vehicles are due.
       void queryClient.invalidateQueries({ queryKey: ["vehicles"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -49,17 +51,17 @@ export function useOdometerUpload() {
  * Fetched rather than linked: an `<a download>` cannot carry an Authorization
  * header, and the endpoint is manager-only. So the bytes are fetched with the
  * token, turned into a blob, and handed to a temporary link.
+ *
+ * It takes the same query shape as the services list, which is what makes
+ * "export exactly what I am looking at" one call with the filters already on
+ * screen - paging aside, which the export deliberately ignores.
  */
 export async function downloadExport(query: ServiceQuery): Promise<void> {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query)) {
-    if (value === undefined || value === "") continue;
-    params.set(key, String(value));
-  }
+  const { page: _page, limit: _limit, sort: _sort, order: _order, ...filters } = query;
 
   const token = readToken();
   const response = await fetch(
-    `${apiBaseUrl()}/services/export.csv?${params.toString()}`,
+    `${apiBaseUrl()}/services/export.csv${toSearchParams(filters)}`,
     { headers: token ? { Authorization: `Bearer ${token}` } : {} },
   );
 

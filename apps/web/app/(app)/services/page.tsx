@@ -1,14 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
-import { StatusBadge } from "@/components/services/status-badge";
+import { NewServiceModal } from "@/components/services/new-service-modal";
+import { StatusBadge, accentFor } from "@/components/services/status-badge";
 import { Button } from "@/components/ui/button";
+import { FilterBar, FilterChip } from "@/components/ui/filter-bar";
 import { Input } from "@/components/ui/input";
-import { Modal } from "@/components/ui/modal";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Pagination } from "@/components/ui/pagination";
+import { Select } from "@/components/ui/select";
+import { TableSkeleton } from "@/components/ui/skeleton";
+import { SortableHead } from "@/components/ui/sortable-head";
+import { EmptyState, ErrorState } from "@/components/ui/states";
 import {
   Table,
   TableBody,
@@ -17,90 +21,173 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useToast } from "@/components/ui/toast";
+import { VehiclePicker } from "@/components/vehicles/vehicle-picker";
 import { useCurrentUser } from "@/hooks/use-auth";
-import { useCreateService, useServices } from "@/hooks/use-services";
-import { useVehicles } from "@/hooks/use-vehicles";
-import { LIFECYCLE, STATUS_LABELS, type ServiceSort, type ServiceStatus } from "@/types/service";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useQueryParams } from "@/hooks/use-query-params";
+import { downloadExport } from "@/hooks/use-reports";
+import { useServices } from "@/hooks/use-services";
+import { useTechnicians } from "@/hooks/use-technicians";
+import { formatDate, formatDateTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import {
+  LIFECYCLE,
+  STATUS_LABELS,
+  type ServiceQuery,
+  type ServiceSort,
+  type ServiceStatus,
+} from "@/types/service";
 
 export default function ServicesPage() {
+  // useSearchParams needs a Suspense boundary for the statically-rendered
+  // shell; the view below it reads the URL as its own state.
   return (
-    <Suspense fallback={<ListSkeleton />}>
+    <Suspense fallback={<TableSkeleton label="Loading services" columns={6} />}>
       <ServicesView />
     </Suspense>
   );
 }
 
 function ServicesView() {
-  const router = useRouter();
-  const params = useSearchParams();
+  const { params, setParams } = useQueryParams("/services");
   const { user } = useCurrentUser();
   const isManager = user?.role === "fleet_manager";
+  const toast = useToast();
 
   const [creating, setCreating] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
-  const query = {
-    search: params.get("search") ?? "",
+  // Every filter the API accepts is read from the URL, so a link from the
+  // dashboard - /services?technician_id=5 - arrives filtered rather than
+  // quietly showing the whole fleet.
+  const query: ServiceQuery = {
+    search: params.get("search") || undefined,
     status: (params.get("status") as ServiceStatus) || undefined,
     vehicle_id: Number(params.get("vehicle_id")) || undefined,
+    technician_id: Number(params.get("technician_id")) || undefined,
+    overdue: params.get("overdue") === "true" ? true : undefined,
     sort: (params.get("sort") as ServiceSort) || "updated_at",
-    order: params.get("order") === "asc" ? ("asc" as const) : ("desc" as const),
+    order: params.get("order") === "asc" ? "asc" : "desc",
     page: Number(params.get("page")) || 1,
+    limit: Number(params.get("limit")) || 20,
   };
 
-  const { data, error, isPending, isPlaceholderData } = useServices(query);
+  const { data, error, isPending, isPlaceholderData, refetch } =
+    useServices(query);
+  const { data: technicians } = useTechnicians(Boolean(isManager));
 
-  function setParam(changes: Record<string, string | null>) {
-    const next = new URLSearchParams(params.toString());
-    for (const [key, value] of Object.entries(changes)) {
-      if (value === null || value === "") next.delete(key);
-      else next.set(key, value);
-    }
-    if (!("page" in changes)) next.delete("page");
-    router.replace(`/services?${next.toString()}`);
-  }
+  // The input stays instant; only the request waits for the typing to stop.
+  const [searchInput, setSearchInput] = useState(params.get("search") ?? "");
+  const debouncedSearch = useDebouncedValue(searchInput, 300);
+
+  useEffect(() => {
+    const current = params.get("search") ?? "";
+    if (debouncedSearch !== current) setParams({ search: debouncedSearch });
+  }, [debouncedSearch, params, setParams]);
 
   function toggleSort(column: ServiceSort) {
     const same = query.sort === column;
-    setParam({
+    setParams({
       sort: column,
       order: same && query.order === "desc" ? "asc" : "desc",
     });
   }
 
+  function clearFilters() {
+    setSearchInput("");
+    setParams({
+      search: null,
+      status: null,
+      vehicle_id: null,
+      technician_id: null,
+      overdue: null,
+    });
+  }
+
+  async function exportView() {
+    setExporting(true);
+    setExportError(null);
+    try {
+      // The same query object the table is showing, minus the paging: the
+      // export is "what I am looking at", not "page 2 of it".
+      await downloadExport(query);
+      toast("Export downloaded");
+    } catch (cause) {
+      setExportError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not generate the export.",
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  const technicianName = technicians?.find(
+    (person) => person.id === query.technician_id,
+  )?.full_name;
+
+  const hasFilters = Boolean(
+    query.search ||
+      query.status ||
+      query.vehicle_id ||
+      query.technician_id ||
+      query.overdue,
+  );
+
+  const sort = query.sort ?? "updated_at";
+  const order = query.order ?? "desc";
+
   return (
-    <main className="space-y-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-lg font-semibold">Services</h1>
-          <p className="text-muted-foreground text-sm">
+    <div className="space-y-4">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-base font-semibold">Service records</h1>
+          <p className="text-muted-foreground mt-0.5 text-sm">
             {/* A technician's list is already scoped by the server, so the
                 count is honest for whoever is reading it. */}
-            {isManager
-              ? `${data?.total ?? "…"} across the fleet`
-              : `${data?.total ?? "…"} assigned to you`}
+            {data
+              ? isManager
+                ? `${data.total} across the fleet`
+                : `${data.total} assigned to you`
+              : " "}
           </p>
         </div>
 
         {isManager ? (
-          <Button onClick={() => setCreating(true)}>New service record</Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={exportView} disabled={exporting}>
+              {exporting ? "Preparing…" : "Export this view"}
+            </Button>
+            <Button onClick={() => setCreating(true)}>New service record</Button>
+          </div>
         ) : null}
       </header>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <FilterBar>
         <Input
           type="search"
           placeholder="Search descriptions"
-          defaultValue={query.search}
-          onChange={(event) => setParam({ search: event.target.value })}
-          className="max-w-xs"
+          value={searchInput}
+          onChange={(event) => setSearchInput(event.target.value)}
+          className="w-56"
           aria-label="Search service records"
         />
 
-        <select
+        <VehiclePicker
+          value={query.vehicle_id}
+          onChange={(vehicleId) => setParams({ vehicle_id: vehicleId ?? null })}
+          includeArchived
+          placeholder="All vehicles"
+          className="w-52"
+        />
+
+        <Select
           value={query.status ?? ""}
-          onChange={(event) => setParam({ status: event.target.value || null })}
+          onChange={(event) => setParams({ status: event.target.value })}
           aria-label="Filter by status"
-          className="border-input bg-background h-9 rounded-md border px-2 text-sm"
         >
           <option value="">All statuses</option>
           {LIFECYCLE.map((status) => (
@@ -108,64 +195,171 @@ function ServicesView() {
               {STATUS_LABELS[status]}
             </option>
           ))}
-        </select>
-      </div>
+        </Select>
 
-      {error ? (
-        <p role="alert" className="text-destructive text-sm">
-          {error.message}
-        </p>
+        {isManager ? (
+          <Select
+            value={query.technician_id ? String(query.technician_id) : ""}
+            onChange={(event) =>
+              setParams({ technician_id: event.target.value })
+            }
+            aria-label="Filter by technician"
+          >
+            <option value="">All technicians</option>
+            {technicians?.map((person) => (
+              <option key={person.id} value={person.id}>
+                {person.full_name}
+              </option>
+            ))}
+          </Select>
+        ) : null}
+
+        <label
+          className={cn(
+            "flex h-8 cursor-pointer items-center gap-2 rounded-md border px-2.5 text-sm transition-colors duration-120",
+            query.overdue
+              ? "border-overdue/30 bg-overdue-soft text-overdue font-medium"
+              : "text-muted-foreground hover:bg-muted/60",
+          )}
+        >
+          <input
+            type="checkbox"
+            checked={Boolean(query.overdue)}
+            onChange={(event) => setParams({ overdue: event.target.checked })}
+            className="size-3.5"
+          />
+          Overdue only
+        </label>
+      </FilterBar>
+
+      {hasFilters ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {query.search ? (
+            <FilterChip
+              label="Search"
+              value={query.search}
+              onClear={() => {
+                setSearchInput("");
+                setParams({ search: null });
+              }}
+            />
+          ) : null}
+          {query.status ? (
+            <FilterChip
+              label="Status"
+              value={STATUS_LABELS[query.status]}
+              onClear={() => setParams({ status: null })}
+            />
+          ) : null}
+          {query.technician_id ? (
+            <FilterChip
+              label="Technician"
+              value={technicianName ?? `#${query.technician_id}`}
+              onClear={() => setParams({ technician_id: null })}
+            />
+          ) : null}
+          {query.overdue ? (
+            <FilterChip
+              label="State"
+              value="Overdue"
+              onClear={() => setParams({ overdue: null })}
+            />
+          ) : null}
+
+          <Button variant="ghost" size="sm" onClick={clearFilters}>
+            Clear all
+          </Button>
+        </div>
       ) : null}
 
-      {isPending ? <ListSkeleton /> : null}
+      {exportError ? (
+        <ErrorState title="Export failed" message={exportError} />
+      ) : null}
+
+      {error ? (
+        <ErrorState message={error.message} onRetry={() => void refetch()} />
+      ) : null}
+
+      {isPending ? <TableSkeleton label="Loading services" columns={6} /> : null}
 
       {data && data.items.length === 0 ? (
-        <p className="text-muted-foreground rounded-md border border-dashed px-4 py-10 text-center text-sm">
-          {query.search || query.status
-            ? "No service records match these filters."
-            : isManager
-              ? "No service records yet. Open one from a vehicle."
-              : "Nothing is assigned to you right now."}
-        </p>
+        <EmptyState
+          title={
+            hasFilters
+              ? "No service records match these filters"
+              : isManager
+                ? "No service records yet"
+                : "Nothing is assigned to you right now"
+          }
+          hint={
+            hasFilters
+              ? "Clear a filter to widen the search."
+              : isManager
+                ? "Open one against a vehicle to start a service cycle."
+                : "A fleet manager assigns work; anything assigned to you appears here."
+          }
+          action={
+            hasFilters ? (
+              <Button variant="outline" size="sm" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            ) : null
+          }
+        />
       ) : null}
 
       {data && data.items.length > 0 ? (
         <div
-          className="rounded-md border"
-          style={{ opacity: isPlaceholderData ? 0.6 : 1 }}
+          className={cn(
+            "overflow-hidden rounded-md border transition-opacity duration-120",
+            // Dimmed while the next page loads, rather than replaced by a
+            // spinner - the old rows stay readable.
+            isPlaceholderData && "opacity-60",
+          )}
         >
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Vehicle</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead>
-                  <SortButton
-                    label="Status"
-                    column="status"
-                    query={query}
-                    onSort={toggleSort}
-                  />
-                </TableHead>
-                <TableHead>
-                  <SortButton
-                    label="Scheduled"
-                    column="scheduled_date"
-                    query={query}
-                    onSort={toggleSort}
-                  />
-                </TableHead>
+                <SortableHead
+                  label="Status"
+                  column="status"
+                  active={sort}
+                  order={order}
+                  onSort={toggleSort}
+                />
+                <SortableHead
+                  label="Scheduled"
+                  column="scheduled_date"
+                  active={sort}
+                  order={order}
+                  onSort={toggleSort}
+                />
                 <TableHead>Technicians</TableHead>
+                <SortableHead
+                  label="Updated"
+                  column="updated_at"
+                  active={sort}
+                  order={order}
+                  onSort={toggleSort}
+                />
               </TableRow>
             </TableHeader>
 
             <TableBody>
               {data.items.map((service) => (
-                <TableRow key={service.id}>
-                  <TableCell className="font-medium whitespace-nowrap">
+                <TableRow
+                  key={service.id}
+                  className={cn(
+                    "border-l-2",
+                    accentFor(service.status, service.is_overdue),
+                  )}
+                >
+                  <TableCell className="whitespace-nowrap">
                     <Link
                       href={`/services/${service.id}`}
-                      className="hover:underline"
+                      className="font-medium hover:underline"
                     >
                       {service.vehicle.registration_number}
                     </Link>
@@ -173,19 +367,34 @@ function ServicesView() {
                       cycle {service.cycle_number}
                     </span>
                   </TableCell>
-                  <TableCell className="text-muted-foreground max-w-xs truncate">
-                    {service.description}
+                  <TableCell className="text-muted-foreground max-w-[22rem] truncate">
+                    <Link
+                      href={`/services/${service.id}`}
+                      className="hover:text-foreground"
+                    >
+                      {service.description}
+                    </Link>
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={service.status} isOverdue={service.is_overdue} />
+                    <StatusBadge
+                      status={service.status}
+                      isOverdue={service.is_overdue}
+                    />
                   </TableCell>
-                  <TableCell className="text-muted-foreground whitespace-nowrap tabular-nums">
-                    {service.scheduled_date ?? "—"}
+                  <TableCell className="text-muted-foreground whitespace-nowrap">
+                    {formatDate(service.scheduled_date)}
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {service.technicians.length === 0
-                      ? "Unassigned"
-                      : service.technicians.map((t) => t.full_name).join(", ")}
+                  <TableCell className="text-muted-foreground max-w-[14rem] truncate text-xs">
+                    {service.technicians.length === 0 ? (
+                      <span className="text-muted-foreground/70">
+                        Unassigned
+                      </span>
+                    ) : (
+                      service.technicians.map((t) => t.full_name).join(", ")
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
+                    {formatDateTime(service.updated_at)}
                   </TableCell>
                 </TableRow>
               ))}
@@ -194,170 +403,18 @@ function ServicesView() {
         </div>
       ) : null}
 
-      {data && data.total_pages > 1 ? (
-        <nav
-          aria-label="Pagination"
-          className="flex items-center justify-between text-sm"
-        >
-          <span className="text-muted-foreground">
-            Page {data.page} of {data.total_pages}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              disabled={data.page <= 1}
-              onClick={() => setParam({ page: String(data.page - 1) })}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="ghost"
-              disabled={data.page >= data.total_pages}
-              onClick={() => setParam({ page: String(data.page + 1) })}
-            >
-              Next
-            </Button>
-          </div>
-        </nav>
+      {data && data.total > 0 ? (
+        <Pagination
+          page={data}
+          label="records"
+          onPage={(page) => setParams({ page })}
+          onLimit={(limit) => setParams({ limit, page: 1 })}
+        />
       ) : null}
 
       {isManager ? (
         <NewServiceModal open={creating} onClose={() => setCreating(false)} />
       ) : null}
-    </main>
-  );
-}
-
-function SortButton({
-  label,
-  column,
-  query,
-  onSort,
-}: {
-  label: string;
-  column: ServiceSort;
-  query: { sort: ServiceSort; order: "asc" | "desc" };
-  onSort: (column: ServiceSort) => void;
-}) {
-  const active = query.sort === column;
-
-  return (
-    <button
-      type="button"
-      onClick={() => onSort(column)}
-      className="hover:text-foreground flex items-center gap-1"
-    >
-      {label}
-      {active ? <span aria-hidden>{query.order === "asc" ? "↑" : "↓"}</span> : null}
-      {active ? (
-        <span className="sr-only">
-          sorted {query.order === "asc" ? "ascending" : "descending"}
-        </span>
-      ) : null}
-    </button>
-  );
-}
-
-function NewServiceModal({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const create = useCreateService();
-  // Only live vehicles: an archived one refuses new records, so offering it
-  // would be offering a 409.
-  const { data: vehicles } = useVehicles({ limit: 100 });
-  const [vehicleId, setVehicleId] = useState("");
-  const [description, setDescription] = useState("");
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Open a service record"
-      description="It starts Due, and the overdue clock starts now."
-    >
-      <form
-        className="space-y-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          create.mutate(
-            { vehicle_id: Number(vehicleId), description },
-            {
-              onSuccess: () => {
-                setVehicleId("");
-                setDescription("");
-                onClose();
-              },
-            },
-          );
-        }}
-      >
-        <div className="space-y-1.5">
-          <label htmlFor="vehicle" className="text-sm font-medium">
-            Vehicle
-          </label>
-          <select
-            id="vehicle"
-            required
-            value={vehicleId}
-            onChange={(event) => setVehicleId(event.target.value)}
-            className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
-          >
-            <option value="">Choose a vehicle</option>
-            {vehicles?.items.map((vehicle) => (
-              <option key={vehicle.id} value={vehicle.id}>
-                {vehicle.registration_number} — {vehicle.make} {vehicle.model}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="space-y-1.5">
-          <label htmlFor="description" className="text-sm font-medium">
-            Description
-          </label>
-          <textarea
-            id="description"
-            required
-            rows={3}
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            placeholder="Brake inspection"
-            className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
-          />
-        </div>
-
-        {create.error ? (
-          <p
-            role="alert"
-            className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm"
-          >
-            {create.error.message}
-          </p>
-        ) : null}
-
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={create.isPending || !vehicleId}>
-            {create.isPending ? "Opening…" : "Open record"}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
-function ListSkeleton() {
-  return (
-    <div className="space-y-2" aria-busy="true" aria-label="Loading services">
-      {[0, 1, 2, 3, 4].map((row) => (
-        <Skeleton key={row} className="h-10 w-full" />
-      ))}
     </div>
   );
 }

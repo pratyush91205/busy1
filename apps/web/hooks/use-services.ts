@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiFetch, type ApiError } from "@/lib/api-client";
+import { toSearchParams } from "@/lib/query-string";
 import type { Page } from "@/types/vehicle";
 import type {
   AuditEvent,
@@ -141,12 +142,3 @@ function post<T>(path: string, body: unknown): Promise<T> {
   });
 }
 
-function toSearchParams(query: ServiceQuery): string {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query)) {
-    if (value === undefined || value === "") continue;
-    params.set(key, String(value));
-  }
-  const encoded = params.toString();
-  return encoded ? `?${encoded}` : "";
-}
