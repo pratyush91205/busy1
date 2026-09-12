@@ -6,8 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
+import { useToast } from "@/components/ui/toast";
 import { useTransition } from "@/hooks/use-services";
-import { STATUS_LABELS, type ServiceRecord, type ServiceStatus } from "@/types/service";
+import { useVehicle } from "@/hooks/use-vehicles";
+import { formatMiles } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import type { ServiceRecord, ServiceStatus } from "@/types/service";
 
 /**
  * The one legal next step, if there is one.
@@ -29,66 +33,102 @@ const NEXT: Record<ServiceStatus, ServiceStatus | null> = {
 
 const MANAGER_ONLY: ServiceStatus[] = ["booked"];
 
-export function TransitionActions({
+/** What the button says - the action, not the destination state. */
+const ACTION_LABEL: Record<ServiceStatus, string> = {
+  due: "Mark due",
+  booked: "Book service",
+  in_service: "Start work",
+  completed: "Complete service",
+};
+
+export function nextStatusFor(status: ServiceStatus): ServiceStatus | null {
+  return NEXT[status];
+}
+
+export function mayTransition(
+  status: ServiceStatus,
+  isManager: boolean,
+): boolean {
+  const next = NEXT[status];
+  if (next === null) return false;
+  return isManager || !MANAGER_ONLY.includes(next);
+}
+
+/**
+ * The button that moves a record one step, with whatever the step needs.
+ *
+ * Booking needs a date; completing needs the closing odometer. Both are asked
+ * for in a dialog rather than assumed, and both are validated again by the
+ * server - the completion reading against the vehicle's current one, the
+ * transition against the lifecycle table.
+ */
+export function TransitionButton({
   service,
   isManager,
+  size = "md",
+  className,
 }: {
   service: ServiceRecord;
   isManager: boolean;
+  size?: "sm" | "md";
+  className?: string;
 }) {
   const move = useTransition(service.id);
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [scheduledDate, setScheduledDate] = useState("");
   const [odometer, setOdometer] = useState("");
 
   const next = NEXT[service.status];
+  // Only loaded when it is about to be needed: the completion dialog shows the
+  // reading the new one has to beat.
+  const vehicle = useVehicle(service.vehicle.id, open && next === "completed");
 
-  if (next === null) {
-    return (
-      <p className="text-muted-foreground rounded-md border border-dashed px-4 py-3 text-sm">
-        This cycle is complete. The vehicle&rsquo;s next service interval counts
-        from its completion.
-      </p>
-    );
-  }
+  if (next === null || !mayTransition(service.status, isManager)) return null;
 
-  const allowed = isManager || !MANAGER_ONLY.includes(next);
   const needsInput = next === "booked" || next === "completed";
 
   function submit() {
+    if (next === null) return;
+
     move.mutate(
       {
-        status: next as ServiceStatus,
+        status: next,
         ...(next === "booked" ? { scheduled_date: scheduledDate } : {}),
         ...(next === "completed"
           ? { completion_odometer: Number(odometer) }
           : {}),
       },
-      { onSuccess: () => setOpen(false) },
+      {
+        onSuccess: (updated) => {
+          setOpen(false);
+          setScheduledDate("");
+          setOdometer("");
+          toast(
+            updated.status === "completed"
+              ? "Service completed - the next cycle counts from here"
+              : `Moved to ${updated.status === "in_service" ? "In Service" : "Booked"}`,
+          );
+        },
+      },
     );
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-md border px-4 py-3">
-      <span className="text-sm">
-        Next step: <strong>{STATUS_LABELS[next]}</strong>
-      </span>
+    <>
+      <Button
+        size={size}
+        className={className}
+        disabled={move.isPending}
+        onClick={() => (needsInput ? setOpen(true) : submit())}
+      >
+        {move.isPending ? "Working…" : ACTION_LABEL[next]}
+      </Button>
 
-      {allowed ? (
-        <Button
-          disabled={move.isPending}
-          onClick={() => (needsInput ? setOpen(true) : submit())}
-        >
-          {move.isPending ? "Working…" : `Mark ${STATUS_LABELS[next]}`}
-        </Button>
-      ) : (
-        <span className="text-muted-foreground text-sm">
-          Booking is a fleet manager&rsquo;s action.
-        </span>
-      )}
-
+      {/* A failure outside the dialog still has to be visible, and the
+          server's own wording is the useful part of it. */}
       {move.error && !open ? (
-        <p role="alert" className="text-destructive w-full text-sm">
+        <p role="alert" className="text-destructive mt-2 w-full text-sm">
           {move.error.message}
         </p>
       ) : null}
@@ -102,7 +142,7 @@ export function TransitionActions({
         title={next === "booked" ? "Book this service" : "Complete this service"}
         description={
           next === "booked"
-            ? "A booked service needs a date."
+            ? "A booked service needs a date. Booking also stops the overdue clock for this cycle."
             : "The completion reading becomes the vehicle's odometer and starts the next mileage interval. It cannot be lower than the vehicle's current reading."
         }
       >
@@ -120,6 +160,7 @@ export function TransitionActions({
                 id="scheduled_date"
                 type="date"
                 required
+                className="h-9"
                 value={scheduledDate}
                 onChange={(event) => setScheduledDate(event.target.value)}
               />
@@ -130,11 +171,17 @@ export function TransitionActions({
               <Input
                 id="completion_odometer"
                 type="number"
-                min={0}
+                min={vehicle.data?.current_odometer ?? 0}
                 required
+                className="h-9"
                 value={odometer}
                 onChange={(event) => setOdometer(event.target.value)}
               />
+              {vehicle.data ? (
+                <p className="text-muted-foreground text-xs">
+                  Current reading: {formatMiles(vehicle.data.current_odometer)}
+                </p>
+              ) : null}
             </div>
           )}
 
@@ -148,15 +195,83 @@ export function TransitionActions({
           ) : null}
 
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setOpen(false);
+                move.reset();
+              }}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={move.isPending}>
-              {move.isPending ? "Working…" : `Mark ${STATUS_LABELS[next]}`}
+              {move.isPending ? "Working…" : ACTION_LABEL[next]}
             </Button>
           </div>
         </form>
       </Modal>
+    </>
+  );
+}
+
+/**
+ * The next step, as a strip across the service detail page: what happens next,
+ * who may do it, and the button if that is this user.
+ */
+export function TransitionPanel({
+  service,
+  isManager,
+  className,
+}: {
+  service: ServiceRecord;
+  isManager: boolean;
+  className?: string;
+}) {
+  const next = NEXT[service.status];
+
+  if (next === null) {
+    return (
+      <div
+        className={cn(
+          "border-completed/30 bg-completed-soft rounded-md border px-4 py-3",
+          className,
+        )}
+      >
+        <p className="text-completed text-sm font-medium">
+          This cycle is complete.
+        </p>
+        <p className="text-completed/90 mt-0.5 text-sm">
+          The vehicle&rsquo;s next service interval counts from its completion
+          date and odometer, not from when the vehicle was added.
+        </p>
+      </div>
+    );
+  }
+
+  const allowed = mayTransition(service.status, isManager);
+
+  return (
+    <div
+      className={cn(
+        "flex flex-wrap items-center justify-between gap-3 rounded-md border px-4 py-3",
+        className,
+      )}
+    >
+      <div>
+        <p className="text-sm font-medium">Next step: {ACTION_LABEL[next]}</p>
+        <p className="text-muted-foreground mt-0.5 text-sm">
+          {allowed
+            ? next === "booked"
+              ? "Booking sets the date this service is scheduled for."
+              : next === "in_service"
+                ? "Start work when the vehicle is in the bay."
+                : "Completing records the closing odometer and resets both counters."
+            : "Booking is a fleet manager's action - it sets the schedule."}
+        </p>
+      </div>
+
+      <TransitionButton service={service} isManager={isManager} />
     </div>
   );
 }

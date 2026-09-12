@@ -2,8 +2,15 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/states";
 import { useTimeline } from "@/hooks/use-services";
-import { STATUS_LABELS, type AuditEvent, type ServiceStatus } from "@/types/service";
+import { formatDateTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import {
+  STATUS_LABELS,
+  type AuditEvent,
+  type ServiceStatus,
+} from "@/types/service";
 
 /**
  * The immutable audit trail, oldest first.
@@ -13,21 +20,32 @@ import { STATUS_LABELS, type AuditEvent, type ServiceStatus } from "@/types/serv
  * and DELETE. Nothing on this screen could remove an entry even if it tried.
  */
 export function ServiceTimeline({ id }: { id: number }) {
-  const { data: events, error, isPending } = useTimeline(id);
+  const { data: events, error, isPending, refetch } = useTimeline(id);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm font-medium">Timeline</CardTitle>
+        <CardTitle>Audit timeline</CardTitle>
+        <span className="text-muted-foreground text-xs">
+          Append-only · {events?.length ?? 0} events
+        </span>
       </CardHeader>
 
       <CardContent className="text-sm">
-        {isPending ? <Skeleton className="h-20 w-full" /> : null}
+        {isPending ? (
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-4 w-3/5" />
+          </div>
+        ) : null}
 
         {error ? (
-          <p role="alert" className="text-destructive">
-            {error.message}
-          </p>
+          <ErrorState
+            title="Could not load the timeline"
+            message={error.message}
+            onRetry={() => void refetch()}
+          />
         ) : null}
 
         {events && events.length === 0 ? (
@@ -35,21 +53,30 @@ export function ServiceTimeline({ id }: { id: number }) {
         ) : null}
 
         {events && events.length > 0 ? (
-          <ol className="space-y-3">
+          <ol className="relative space-y-4 pl-5">
+            {/* One rule down the left, so a long history reads as a sequence
+                rather than a list of sentences. */}
+            <span
+              aria-hidden
+              className="bg-border absolute top-1.5 bottom-1.5 left-[3px] w-px"
+            />
+
             {events.map((event) => (
-              <li key={event.id} className="flex gap-3">
+              <li key={event.id} className="relative">
                 <span
                   aria-hidden
-                  className="bg-muted-foreground/40 mt-1.5 size-2 shrink-0 rounded-full"
+                  className={cn(
+                    "absolute top-1.5 -left-5 size-[7px] rounded-full ring-2",
+                    "ring-background",
+                    dotFor(event),
+                  )}
                 />
-                <div className="space-y-0.5">
-                  <p>{describe(event)}</p>
-                  <p className="text-muted-foreground text-xs">
-                    {/* Null actor means the system acted rather than a person. */}
-                    {event.actor?.full_name ?? "System"} ·{" "}
-                    {new Date(event.created_at).toLocaleString()}
-                  </p>
-                </div>
+                <p>{describe(event)}</p>
+                <p className="text-muted-foreground mt-0.5 text-xs">
+                  {/* Null actor means the system acted rather than a person. */}
+                  {event.actor?.full_name ?? "System"} &middot;{" "}
+                  {formatDateTime(event.created_at)}
+                </p>
               </li>
             ))}
           </ol>
@@ -57,6 +84,22 @@ export function ServiceTimeline({ id }: { id: number }) {
       </CardContent>
     </Card>
   );
+}
+
+/** Status changes take the colour of the state they arrived at. */
+function dotFor(event: AuditEvent): string {
+  if (event.event_type !== "status_changed") return "bg-muted-foreground/40";
+
+  switch (event.new_value as ServiceStatus) {
+    case "booked":
+      return "bg-booked";
+    case "in_service":
+      return "bg-in-service";
+    case "completed":
+      return "bg-completed";
+    default:
+      return "bg-due";
+  }
 }
 
 function describe(event: AuditEvent): string {
