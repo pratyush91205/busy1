@@ -57,7 +57,15 @@ export function useOdometerUpload() {
  * screen - paging aside, which the export deliberately ignores.
  */
 export async function downloadExport(query: ServiceQuery): Promise<void> {
-  const { page: _page, limit: _limit, sort: _sort, order: _order, ...filters } = query;
+  // Paging and ordering are not part of an export: it is every matching row,
+  // in the server's order, not the page currently on screen.
+  const filters = {
+    search: query.search,
+    status: query.status,
+    vehicle_id: query.vehicle_id,
+    technician_id: query.technician_id,
+    overdue: query.overdue,
+  };
 
   const token = readToken();
   const response = await fetch(
