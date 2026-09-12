@@ -14,7 +14,8 @@ Two hours a day, one phase each, specced in `.claude/specs/` before being built.
 | 6 | Due, overdue and alerts | 2h 00 | 2h 30 |
 | 7 | Bulk odometer upload and export | 2h 00 | 2h 00 |
 | 8 | Dashboard and seed data | 2h 00 | 2h 00 |
-| | Total | 16h 00 | 18h 05 |
+| 9 | Frontend experience | 2h 30 | 3h 00 |
+| | Total | 18h 30 | 21h 05 |
 
 ## Order
 
@@ -77,6 +78,21 @@ the features were written but never added to `requirements.txt`. The suite
 runs in that same venv, so it could never have caught the second one — a
 fresh deploy would have failed at import.
 
+Session 9, 30 minutes over, and the one session that didn't finish what it set
+out to do. The build was fine — the frontend pass landed in six commits and
+type-check, lint, production build and pytest all pass. Verification is what
+went wrong: the Chrome extension I drive the browser with kept freezing the
+renderer, so the manager and technician click-throughs, the 375px check and the
+keyboard pass are still not done. Resizing the window unfroze it once, long
+enough to log in and confirm the login screen's error state, then it froze
+again. The fleet-wide checks I could make without a browser — filter totals and
+role scoping through the API — came back right.
+
+The session also found a real bug rather than a polish item: `/services` had
+never read `technician_id` or `overdue` out of the URL, so the dashboard's own
+"view records" link silently showed the whole fleet instead of that
+technician's four.
+
 ## Cut
 
 Nothing cut from the ten goals.
@@ -89,7 +105,11 @@ If time runs short: Playwright tests go first, then UI polish, then CSV export
 conveniences. Not cut: authorization, lifecycle validation, due/overdue
 correctness, audit trail, per-row bulk reporting.
 
-Over the 12-hour estimate by about six hours. The overrun is mostly two
-things: a schema change mid-spec in session 6, and the size of session 5 —
+Over the 12-hour estimate by about nine hours. The overrun is mostly three
+things: a schema change mid-spec in session 6, the size of session 5 —
 records, assignment, lifecycle and audit had to be one piece because every
-mutation writes its audit event in the same transaction.
+mutation writes its audit event in the same transaction — and session 9,
+which was frontend work the first eight sessions had deferred.
+
+Still open: the browser walkthrough of both roles, the narrow-screen check and
+the keyboard pass, all blocked on tooling rather than on the code.

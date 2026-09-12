@@ -256,3 +256,51 @@
   can't explain. Trade-off: backdating completions can't go through the service
   layer — the rules are about the present — so those timestamps are written
   directly, the one hand-written exception, and it's commented where it happens.
+
+## Decision 27
+
+- **Chose:** two shells — a manager console with a persistent rail, a technician
+  work queue in a narrow column with two destinations.
+- **Rejected:** one shell with the manager-only links hidden from technicians.
+- **Why:** the two jobs aren't the same job. A manager scans four hundred rows;
+  a technician reads one job at a time, and their whole world is `/my-work`.
+  The hidden-link version also reads as a product someone has been locked out
+  of, which is the wrong impression when the API genuinely has nothing
+  fleet-wide to give them. Trade-off: two layouts to keep visually consistent,
+  and `landingRouteFor` has to be the single answer to "where does this role
+  start" or login and the redirects disagree.
+
+## Decision 28
+
+- **Chose:** every list's filters, sort, page and page size live in the URL.
+- **Rejected:** React state inside the page component.
+- **Why:** a filtered view is then linkable and survives a reload, the back
+  button means what it looks like it means, and the dashboard can deep-link
+  into `/services?technician_id=5`. It also makes client-side filtering
+  awkward enough that nobody does it by accident — the parameter goes to the
+  server or it does nothing. Trade-off: typing in a search box would write a
+  history entry per keystroke, so the input keeps its own state and the URL is
+  written 300ms after typing stops.
+
+## Decision 29
+
+- **Chose:** the vehicle picker searches the server, ten at a time.
+- **Rejected:** fetching the first hundred vehicles and filtering them in the
+  browser, which is what the export and new-record dialogs did.
+- **Why:** the brief calls out browser-side filtering as the thing not to do,
+  and the hundred-row version silently stops working at vehicle 101 — worse
+  than failing, because it looks like the vehicle doesn't exist. Trade-off: a
+  native `<select>` would have given keyboard behaviour and type-ahead for
+  free; a combobox over async options means writing arrow keys, Enter, Escape
+  and `aria-activedescendant` by hand.
+
+## Decision 30
+
+- **Chose:** successes are toasted, failures stay inline next to the control
+  that failed, carrying the server's own message.
+- **Rejected:** one notification mechanism for both.
+- **Why:** "Completion odometer 4000 is lower than the vehicle's current
+  reading 52300" is the useful half of a rejection, and a message that removes
+  itself after four seconds is no way to deliver it. A success has nothing to
+  read and shouldn't hold the screen. Trade-off: two patterns to remember when
+  adding a mutation.

@@ -4,6 +4,7 @@
 
 - **apps/web** — Next.js 16 App Router, TypeScript, Tailwind, TanStack Query.
   No business rules; renders loading, error, empty and success for every answer.
+  Two shells, one per role (`decisions.md`, 27).
 - **apps/api** — FastAPI, Python 3.13, SQLAlchemy 2, Alembic. All rules live
   here, layered route → service → repository → database.
 - **PostgreSQL 17** — data, plus constraints and the triggers that keep
@@ -129,6 +130,25 @@ interpolated string, and `%` in a search term is escaped. The shape
 (`items`, `total`, `page`, `limit`, `total_pages`) is shared, so the service
 listing reuses it rather than inventing a second one.
 
+## What the browser does
+
+Nothing that decides anything. Two shells — a manager console, a technician
+queue — chosen from the role the server reports, so a technician who types
+`/alerts` is redirected *and* refused (`decisions.md`, 27).
+
+Every list keeps its filters, sort, page and page size in the URL, which is
+what makes a filtered view shareable and what keeps filtering on the server
+where it belongs: the parameter goes to the API or nothing happens. Search
+waits 300ms after typing stops, so a ten-character registration is one request
+rather than ten. TanStack Query holds the previous page on screen while the
+next one loads, and invalidates by key after a mutation — completing a service
+re-reads the vehicle, because the vehicle's odometer moved.
+
+Five colours mean something (Due, Overdue, Booked, In Service, Completed), and
+they come from tokens rather than per-component classes, so a status looks the
+same in a badge, a row edge and the lifecycle rail. Every badge carries its
+text: colour alone isn't a label.
+
 ## Not built
 
 - Refresh tokens — 12-hour access token, then log in again.
@@ -143,3 +163,6 @@ listing reuses it rather than inventing a second one.
   service history readable.
 - Odometer history and stored overdue alerts — see `decisions.md`.
 - Any scheduler. Maintenance state must follow from the database and the clock.
+- A frontend test runner. Playwright was the optional goal and the budget went
+  elsewhere; the frontend is covered by type-check, lint, a production build
+  and by hand.

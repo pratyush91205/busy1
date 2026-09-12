@@ -349,3 +349,66 @@ archived, 2 due, 1 overdue, 1 in service, 1 completed this week, all four
 statuses populated, all four technicians with work, and six of eight weeks
 non-zero. The alert badge returned the same 1 the overdue tile did — the
 dismissed second overdue record correctly absent from both.
+
+## Frontend experience
+
+### Prompt
+
+Build the frontend against the existing API and real Supabase data: manager
+dashboard with attention items, vehicles, server-side search and filtering on
+services, the lifecycle on a service record, a technician "My Work" workflow,
+assignment, audit timeline, alerts with a nav badge, CSV import with per-row
+results, export, and role-aware navigation. Polished, information-dense, not a
+generic SaaS dashboard. Then type-check, lint, build and verify both roles in
+the browser.
+
+Specced first, and the spec is the part that paid off: reading the existing
+code before writing any turned "build the frontend" into "finish the six
+places it is thin and fix the one place it is wrong", which is a much smaller
+job than the prompt implies.
+
+### What you got
+
+The spec caught a real defect that a from-scratch rebuild would have papered
+over: `/services` read `search`, `status`, `vehicle_id`, `sort` and `page` out
+of the URL but not `technician_id` or `overdue`. The dashboard had been
+linking to `/services?technician_id=5` since the dashboard existed, and the
+list quietly answered with the whole fleet.
+
+The build itself came out close to right — role-split shells, URL-backed
+filters, the five status colours as tokens rather than per-component classes.
+
+Two things needed fixing on the way. Heredocs stopped writing files above
+about 8KB and silently truncated mid-file, which surfaces as a shell parse
+error rather than a bad file; larger components went through the editor tool
+instead. And `·` written into JSX *text* is six literal characters, not a
+middot — it's only an escape inside a string or template literal.
+
+### What you corrected
+
+Dropped the vehicle filter chip. It needed a registration to display, and the
+only one to hand was whatever happened to be in the current page of results —
+so with a filter that matched nothing, the chip couldn't name the thing it was
+filtering by. The picker already shows the selection and clears it, so the
+chip was a second, worse answer to the same question.
+
+Kept the export honest: it takes the query object the table is showing and
+strips paging and ordering, rather than exporting page 2 of a filtered view.
+
+### Verified rather than trusted
+
+Type-check, lint and the production build are clean — eleven routes including
+`/my-work` — and pytest still passes, which is the check that the frontend
+pass didn't touch the backend.
+
+Against the live Supabase data, through the API: 13 service records, 4 for
+technician 3, 2 overdue, 3 due; a technician's own list returns 4 and their
+requests to `/alerts` and `/dashboard` return 403. That exercises the
+parameters the frontend now sends, not the frontend itself.
+
+The browser walkthrough is **not** done, and that is the honest gap in this
+session. The extension that drives Chrome kept freezing the renderer — on
+example.com as well, so not the app. What did get confirmed visually: the
+login screen renders, and pointing it at an unreachable API produces the
+network-error state with the API's URL in it. Not confirmed: either role's
+click-through, the 375px layout, the keyboard pass.
