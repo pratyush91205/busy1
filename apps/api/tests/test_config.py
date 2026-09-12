@@ -11,9 +11,10 @@ import subprocess
 import sys
 
 import pytest
+from pydantic import ValidationError
 
 from app.core.config import ConfigError, load_settings
-from tests.conftest import API_ROOT, MISSING_ENV_FILE
+from tests.conftest import API_ROOT, MISSING_ENV_FILE, build_test_settings
 
 
 def test_load_settings_names_the_missing_variable(
@@ -47,3 +48,31 @@ def test_importing_the_app_fails_when_database_url_is_absent() -> None:
     assert result.returncode != 0
     assert "ConfigError" in result.stderr
     assert "DATABASE_URL" in result.stderr
+
+
+def test_a_plain_postgresql_url_is_normalised_to_psycopg() -> None:
+    """Supabase, Render and psql all hand out postgresql://.
+
+    Left alone SQLAlchemy would reach for psycopg2, which is not installed,
+    and the pgbouncer connect args - keyed on the psycopg prefix - would be
+    skipped. So the URL can be pasted exactly as the provider gives it.
+    """
+    settings = build_test_settings(
+        database_url="postgresql://postgres.abc:pw@aws-0-eu-west-2.pooler.supabase.com:6543/postgres"
+    )
+
+    assert settings.database_url.startswith("postgresql+psycopg://")
+    assert settings.database_url.endswith(
+        "@aws-0-eu-west-2.pooler.supabase.com:6543/postgres"
+    )
+
+
+def test_an_already_psycopg_url_is_left_alone() -> None:
+    url = "postgresql+psycopg://postgres:pw@localhost:5432/fleet"
+
+    assert build_test_settings(database_url=url).database_url == url
+
+
+def test_a_non_postgres_url_is_still_refused() -> None:
+    with pytest.raises(ValidationError):
+        build_test_settings(database_url="mysql://root@localhost/fleet")

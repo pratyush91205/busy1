@@ -18,7 +18,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 API_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ENV_FILE = API_ROOT / ".env"
 
-SUPPORTED_URL_PREFIXES = ("postgresql://", "postgresql+psycopg://")
+PSYCOPG_PREFIX = "postgresql+psycopg://"
+PLAIN_PREFIX = "postgresql://"
 
 
 class ConfigError(RuntimeError):
@@ -55,15 +56,28 @@ class Settings(BaseSettings):
     @field_validator("database_url", "alembic_database_url", "test_database_url")
     @classmethod
     def check_database_url(cls, value: str | None) -> str | None:
+        """Accept a plain postgresql:// URL, but store the psycopg one.
+
+        Supabase, Render and psql all hand out ``postgresql://``. Left alone,
+        SQLAlchemy reads that as "use the default driver" and reaches for
+        psycopg2, which is not installed - and the pgbouncer connect args,
+        which are keyed on the psycopg prefix, would be silently skipped.
+
+        Normalising here means a URL can be pasted exactly as the provider
+        gives it and still get the right driver and the pooler settings.
+        """
         if not value:
             return None
-        if not value.startswith(SUPPORTED_URL_PREFIXES):
-            scheme = value.split(":", 1)[0]
-            raise ValueError(
-                "must be a PostgreSQL URL beginning with postgresql:// or "
-                f"postgresql+psycopg://, got scheme {scheme!r}"
-            )
-        return value
+        if value.startswith(PSYCOPG_PREFIX):
+            return value
+        if value.startswith(PLAIN_PREFIX):
+            return PSYCOPG_PREFIX + value[len(PLAIN_PREFIX) :]
+
+        scheme = value.split(":", 1)[0]
+        raise ValueError(
+            "must be a PostgreSQL URL beginning with postgresql:// or "
+            f"postgresql+psycopg://, got scheme {scheme!r}"
+        )
 
     @field_validator("cors_origins")
     @classmethod
