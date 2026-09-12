@@ -3,12 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 
-import { AppHeader } from "@/components/app-header";
+import { ManagerShell } from "@/components/shell/manager-shell";
+import { TechnicianShell } from "@/components/shell/technician-shell";
 import { useCurrentUser } from "@/hooks/use-auth";
 
 /**
  * The shell every signed-in page renders inside.
  *
+ * Which shell depends on the role, because the two jobs are not the same job.
  * The redirect is a convenience, not a security boundary: it stops a signed-out
  * visitor staring at an empty page, and nothing more. Every endpoint these
  * pages call enforces its own authorization, so bypassing this guard gets you
@@ -35,10 +37,17 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     );
   }
 
+  const Shell = user.role === "fleet_manager" ? ManagerShell : TechnicianShell;
+
   return (
-    <div className="flex min-h-full flex-col">
-      <AppHeader user={user} />
-      <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</div>
-    </div>
+    <>
+      <a
+        href="#content"
+        className="bg-background sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:border focus:px-3 focus:py-2 focus:text-sm"
+      >
+        Skip to content
+      </a>
+      <Shell user={user}>{children}</Shell>
+    </>
   );
 }
