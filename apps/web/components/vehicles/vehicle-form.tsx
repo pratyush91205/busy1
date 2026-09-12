@@ -163,6 +163,7 @@ function Field({
       <Label htmlFor={id}>{label}</Label>
       <Input
         id={id}
+        className="h-9"
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
         {...props}
