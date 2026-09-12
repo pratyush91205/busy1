@@ -16,10 +16,13 @@ and the clock, so nothing needs keeping warm.
 
 ## Where each runs
 
-Locally for now — a local Postgres cluster, uvicorn, `next dev`. Production is
-meant to be Supabase, Render and Vercel; `render.yaml` is committed, all config
-is environment-driven, no hard-coded hosts. Not deployed yet (see
-`decisions.md`).
+Locally for now — uvicorn and `next dev` against a Supabase project in
+ap-south-1 (Mumbai). pytest runs against a local Postgres cluster instead,
+because the suite migrates its database up and down. Production is meant to be
+Render and Vercel; `render.yaml` pins Render to Singapore, the nearest region
+to the database, since every query is a round trip between the two and a
+request makes several (`decisions.md`, 31). All config is environment-driven,
+no hard-coded hosts. Not deployed yet.
 
 ## Request path: completing a service
 

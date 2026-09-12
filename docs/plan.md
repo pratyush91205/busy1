@@ -93,6 +93,13 @@ never read `technician_id` or `overdue` out of the URL, so the dashboard's own
 "view records" link silently showed the whole fleet instead of that
 technician's four.
 
+After session 9, the app was slow enough to notice — five to six seconds for
+the dashboard. Measured it rather than guessing: 0.41s per query, the same
+for `SELECT 1` as for a count, because the database was in Sydney. Moved it
+to a new project in Mumbai (0.028s per query), re-ran the migrations and the
+seed. The one snag was a password containing `@`, which has to be
+percent-encoded in a connection URI or it gets read as the start of the host.
+
 ## Cut
 
 Nothing cut from the ten goals.

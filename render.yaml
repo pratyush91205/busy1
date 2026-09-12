@@ -13,6 +13,9 @@ services:
     name: fleet-maintenance-api
     runtime: python
     plan: free
+    # Nearest Render region to the Supabase project in ap-south-1 (Mumbai).
+    # Every query is a round trip between the two, so this multiplies.
+    region: singapore
     rootDir: apps/api
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT

@@ -304,3 +304,20 @@
   itself after four seconds is no way to deliver it. A success has nothing to
   read and shouldn't hold the screen. Trade-off: two patterns to remember when
   adding a mutation.
+
+## Decision 31
+
+- **Chose:** move the database to a new Supabase project in ap-south-1
+  (Mumbai), and pin Render to Singapore. Reverses the original project in
+  ap-southeast-2 (Sydney).
+- **Rejected:** staying in Sydney and cutting round trips instead — folding
+  the dashboard's eleven queries into fewer, or caching.
+- **Why:** measured, not guessed. A `SELECT 1` cost 0.41s to Sydney and costs
+  0.028s to Mumbai, and the cost was the same for a `count(*)` — distance, not
+  slow SQL. The dashboard is eleven queries, so it took 5.7s. Fewer queries
+  would have fixed one endpoint; distance multiplied every query in every
+  endpoint. Supabase fixes the region at creation, so this meant a new
+  project, `alembic upgrade head` and a reseed — cheap, because the seed
+  drives the service layer (26). Trade-off: Render has no Mumbai region, so
+  production still pays a Singapore round trip per query, and the old
+  project's data didn't move — it was only ever demo data.
