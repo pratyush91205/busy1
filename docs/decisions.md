@@ -321,3 +321,46 @@
   drives the service layer (26). Trade-off: Render has no Mumbai region, so
   production still pays a Singapore round trip per query, and the old
   project's data didn't move — it was only ever demo data.
+
+## Decision 32
+
+- **Chose:** booking takes a technician as well as a date, assigned in the same
+  transaction with its own audit event, and refused if the record would be
+  booked with nobody on it.
+- **Rejected:** booking as a date only, with assignment a separate step that
+  might never happen.
+- **Why:** the brief has booking assign a scheduled date *and* a technician. A
+  Booked record nobody is on is a schedule nobody keeps. Naming the technician
+  in the booking keeps it one action; a record that already has someone books
+  without naming them again. Trade-off: `technician_id` sits on the transition
+  body but only means something for Booked — naming one on any other move is
+  refused, or it would be reassignment through the wrong door.
+
+## Decision 33
+
+- **Chose:** a vehicle that falls due opens its own Due cycle — at the odometer
+  write that crosses the mileage interval, and on read for the date interval,
+  with `due_since` set to the day it landed. Reverses records only ever being
+  opened by a manager.
+- **Rejected:** manual-only creation; a scheduled job.
+- **Why:** with manual creation, a vehicle past its interval that nobody noticed
+  was never overdue and never alerted, and goal 10's alert only came back if
+  someone remembered to open the next record. A job would make the job the
+  source of truth, which the brief rules out. The sweep is idempotent and dates
+  the record from the data, not from when it ran, so the state still follows
+  from the database and the clock. Trade-offs: GET requests can now write;
+  mileage has no timestamp of its own, so a crossing no write path saw is dated
+  when it's found; two concurrent sweeps are settled by the
+  `(vehicle_id, cycle_number)` unique constraint inside a savepoint.
+
+## Decision 34
+
+- **Chose:** the dashboard's "Due for service" counts vehicles whose cycle is
+  Due and unbooked.
+- **Rejected:** every vehicle past its interval, which is what it counted.
+- **Why:** once cycles open themselves, past-its-interval includes vehicles
+  already booked or in the bay, so a vehicle in service sat in two tiles at
+  once. Unbooked Due cycles make the tiles a pipeline and match the list the
+  tile links to. The overdue tile still equals the alert badge (25). Trade-off:
+  the tile no longer matches the fleet list's "due" filter, which still means
+  interval reached.

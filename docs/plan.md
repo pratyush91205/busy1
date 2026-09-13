@@ -100,6 +100,18 @@ to a new project in Mumbai (0.028s per query), re-ran the migrations and the
 seed. The one snag was a password containing `@`, which has to be
 percent-encoded in a connection URI or it gets read as the start of the host.
 
+Then an audit of the ten goals against the brief itself rather than against my
+own specs. It found three places where the code did something reasonable that
+isn't what the brief says. Booking set a date but not a technician. Sorting by
+status sorted the stored strings, so Booked came before Due. And a vehicle past
+its interval never became a Due record unless a manager opened one — so it was
+never overdue, never alerted, and goal 10's returning alert depended on someone
+remembering. That last one was invisible to the suite because every test opened
+its records by hand. Fixing it made the dashboard's due tile double-count, so
+that changed too (`decisions.md`, 32–34). 257 tests pass, 13 of them new; five
+existing ones broke, every one by booking a record with nobody on it — the new
+rule doing its job.
+
 ## Cut
 
 Nothing cut from the ten goals.

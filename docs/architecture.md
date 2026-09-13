@@ -77,6 +77,10 @@ arithmetic. The service layer fills in the gaps the database can't return:
 a status with no records, a week with no completions, a technician with
 nothing assigned. Each has to be a zero rather than absent.
 
+"Due for service" counts vehicles whose cycle is Due and unbooked, not every
+vehicle past its interval. A booked or in-service vehicle has passed its
+interval too, and counting it would put one vehicle in two tiles.
+
 ## CSV in and out
 
 The bulk odometer upload is the one place that isn't one transaction per
@@ -95,15 +99,20 @@ Easy to conflate, kept apart deliberately.
 
 **Is a vehicle due?** From its intervals and the point the current cycle
 counts from. Either interval alone is enough — they are not required
-together. It's what tells a manager to open a record.
+together. It's what opens the vehicle's next cycle.
 
 **Is a record overdue?** From status `due`, `due_since`, and the grace
 period. It's about a record that was opened and then left unbooked.
 
-A vehicle can be due with no record open; a record can be overdue for a
-vehicle that isn't otherwise due yet. Neither is stored and neither needs a
-job — both follow from the database and the clock, which is what the brief
-asks for.
+A vehicle that falls due opens its own Due record. Mileage only moves when an
+odometer reading is written, so the write that crosses the interval opens the
+cycle in the same transaction. The date moves with the clock and nothing writes
+when it passes, so alerts, the dashboard, the lists and the export open due
+cycles before they read — idempotently, with `due_since` set to the day the
+interval landed rather than the moment someone looked. A manager can still open
+a record early, so a record can be overdue for a vehicle not otherwise due.
+Still no job: what gets opened follows from the database and the clock, not
+from when the sweep ran (`decisions.md`, 33).
 
 An alert is not a row either. It *is* an overdue record, so there's nothing
 to create or reconcile and nothing that can disagree with the records. Only
@@ -120,8 +129,8 @@ and lives in the service layer: a technician sees only records they are
 assigned to, and one they aren't gets 404 rather than 403.
 
 Some rules need both. An assigned technician may start and complete a
-service — that is the work — but booking sets the schedule and stays a
-manager's. So the transition endpoint has no role dependency at all; the
+service — that is the work — but booking sets the schedule and who does
+the work, and stays a manager's. So the transition endpoint has no role dependency at all; the
 check depends on which move is being asked for.
 
 ## Listing
@@ -132,6 +141,10 @@ can't become a full-table export, sort columns are an enum rather than an
 interpolated string, and `%` in a search term is escaped. The shape
 (`items`, `total`, `page`, `limit`, `total_pages`) is shared, so the service
 listing reuses it rather than inventing a second one.
+
+Sorting services by status sorts by lifecycle position — Due, Booked, In
+Service, Completed — through a `CASE`. The stored strings sort alphabetically,
+which puts Booked first and Due third.
 
 ## What the browser does
 

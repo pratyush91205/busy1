@@ -412,3 +412,47 @@ example.com as well, so not the app. What did get confirmed visually: the
 login screen renders, and pointing it at an unreachable API produces the
 network-error state with the API's URL in it. Not confirmed: either role's
 click-through, the 375px layout, the keyboard pass.
+
+## Audit against the brief
+
+### Prompt
+
+The ten goals pasted from the brief, with: some of these aren't performing
+well — fix what's needed and update the docs.
+
+### What you got
+
+The useful part was the order. It read the code against the brief goal by goal
+before changing anything, and came back with four findings rather than a
+rewrite: booking set no technician; a vehicle past its interval never became a
+Due record on its own; status sorted alphabetically; and, as a consequence of
+fixing the second, the dashboard's due tile would count one vehicle in two
+tiles. No schema change was needed for any of it.
+
+### What you corrected
+
+Its patch scripts read and wrote files with Python's platform default encoding,
+which on Windows is cp1252. One component with real ellipsis characters came
+back as mojibake, and the first "repair" decoded the whole file as cp1252 —
+correct for the part it had broken, wrong for the part that was fine. Fixed by
+mapping the three-byte sequence back; every later patch reads and writes bytes
+as UTF-8.
+
+Two near misses caught by its own checks rather than by me: a test patch whose
+anchor appeared twice was refused by a uniqueness assert instead of editing the
+wrong test, and a pytest run that printed nothing was re-run rather than read as
+a pass — an extra `-q` on top of the project's own had made it `-qq`, which
+drops the summary line.
+
+### Verified rather than trusted
+
+257 tests pass, 13 new: the booking rules, status sort, and due cycles opening
+themselves — including goal 10 end to end, where no test step opens a record by
+hand.
+
+Then against the live Mumbai data, after restarting the API onto the new code:
+the two vehicles the seed drove past their mileage interval now have Due cycles
+the system opened, with a null actor on the timeline; booking one with nobody
+assigned is refused 409 with the reason; status sorts in lifecycle order across
+all 15 records; and the dashboard's due tile equals the number of vehicles with
+a Due record. The browser walkthrough is still not done.
