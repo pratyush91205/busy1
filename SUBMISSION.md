@@ -4,6 +4,7 @@
 
 - **GitHub repository:** https://github.com/pratyush91205/busy1
 - **Live application:** https://busy1-gamma.vercel.app
+- **Backend Deployment link:** https://api-production-d13f6.up.railway.app/docs
 
 ## Notes for the reviewer
 
@@ -15,8 +16,6 @@
   4 due, 1 in service and 1 overdue alert.
 - As a technician, the list of every record assigned to you is at `/services`.
   It isn't in the technician navigation yet (goal 5).
-- The API is at https://api-production-d13f6.up.railway.app, with interactive
-  docs at `/docs`.
 
 ## Demo credentials
 
