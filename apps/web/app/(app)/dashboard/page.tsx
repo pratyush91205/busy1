@@ -2,13 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import { CompletionsChart } from "@/components/dashboard/completions-chart";
-import { NewServiceModal } from "@/components/services/new-service-modal";
 import { TransitionButton } from "@/components/services/transition-actions";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/states";
@@ -23,10 +21,10 @@ import {
 import { useAlerts } from "@/hooks/use-alerts";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { useDashboard } from "@/hooks/use-dashboard";
-import { useVehicles } from "@/hooks/use-vehicles";
-import { daysSince, formatMiles } from "@/lib/format";
+import { useServices } from "@/hooks/use-services";
+import { daysSince } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { STATUS_LABELS } from "@/types/service";
+import { STATUS_LABELS, type ServiceRecord } from "@/types/service";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -77,7 +75,7 @@ export default function DashboardPage() {
             <StatTile
               label="Due for service"
               value={data.vehicles.due}
-              href="/vehicles?due=true"
+              href="/services?status=due"
               tone={data.vehicles.due > 0 ? "due" : "neutral"}
             />
             <StatTile
@@ -199,17 +197,22 @@ export default function DashboardPage() {
 /**
  * What a manager should do something about, with the action attached.
  *
- * Both halves are their own server queries - the five longest-overdue records
- * and the five vehicles the API says are due - rather than anything counted or
- * sliced here.
+ * Two server queries: the five longest-overdue records, and Due records still
+ * inside their grace period. A vehicle that falls due opens its own cycle, so
+ * both halves are records - and each row carries the booking that clears it.
  */
 function NeedsAttention() {
   const alerts = useAlerts(true, { limit: 5 });
-  const due = useVehicles({ due: true, limit: 5 });
-  const [openingFor, setOpeningFor] = useState<number | null>(null);
+  const awaiting = useServices({
+    status: "due",
+    overdue: false,
+    sort: "updated_at",
+    order: "desc",
+    limit: 5,
+  });
 
   const nothing =
-    alerts.data?.items.length === 0 && due.data?.items.length === 0;
+    alerts.data?.items.length === 0 && awaiting.data?.items.length === 0;
 
   if (nothing) {
     return (
@@ -218,7 +221,7 @@ function NeedsAttention() {
           <CardTitle>Needs attention</CardTitle>
         </CardHeader>
         <CardContent className="text-muted-foreground text-sm">
-          Nothing overdue, and nothing due for service. The fleet is on
+          Nothing overdue, and nothing waiting to be booked. The fleet is on
           schedule.
         </CardContent>
       </Card>
@@ -227,147 +230,117 @@ function NeedsAttention() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card className="border-overdue/30">
-        <CardHeader>
-          <CardTitle>Overdue records</CardTitle>
-          <Link
-            href="/alerts"
-            className="text-muted-foreground hover:text-foreground text-xs"
-          >
-            All alerts
-            {alerts.data && alerts.data.total > 5
-              ? ` (${alerts.data.total})`
-              : ""}
-          </Link>
-        </CardHeader>
-        <CardContent className="p-0">
-          {alerts.isPending ? (
-            <div className="p-4">
-              <Skeleton className="h-16 w-full" />
-            </div>
-          ) : null}
-
-          {alerts.data?.items.length === 0 ? (
-            <p className="text-muted-foreground p-4 text-sm">
-              Nothing has passed the grace period.
-            </p>
-          ) : null}
-
-          <ul className="divide-y">
-            {alerts.data?.items.map((service) => (
-              <li
-                key={service.id}
-                className="flex items-center justify-between gap-3 px-4 py-2.5"
-              >
-                <div className="min-w-0">
-                  <Link
-                    href={`/services/${service.id}`}
-                    className="text-sm font-medium hover:underline"
-                  >
-                    {service.vehicle.registration_number}
-                  </Link>
-                  <p className="text-muted-foreground truncate text-xs">
-                    {service.description}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className="text-overdue text-xs font-medium tabular-nums">
-                    {service.overdue_since
-                      ? `${daysSince(service.overdue_since)}d overdue`
-                      : "Overdue"}
-                  </span>
-                  {/* Booking is the action that clears it - and the one the
-                      API allows only a manager. */}
-                  <TransitionButton
-                    service={service}
-                    isManager
-                    size="sm"
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-
-      <Card className="border-due/30">
-        <CardHeader>
-          <CardTitle>Vehicles due for service</CardTitle>
-          <Link
-            href="/vehicles?due=true"
-            className="text-muted-foreground hover:text-foreground text-xs"
-          >
-            All due
-            {due.data && due.data.total > 5 ? ` (${due.data.total})` : ""}
-          </Link>
-        </CardHeader>
-        <CardContent className="p-0">
-          {due.isPending ? (
-            <div className="p-4">
-              <Skeleton className="h-16 w-full" />
-            </div>
-          ) : null}
-
-          {due.data?.items.length === 0 ? (
-            <p className="text-muted-foreground p-4 text-sm">
-              Nothing has reached its date or mileage interval.
-            </p>
-          ) : null}
-
-          <ul className="divide-y">
-            {due.data?.items.map((vehicle) => (
-              <li
-                key={vehicle.id}
-                className="flex items-center justify-between gap-3 px-4 py-2.5"
-              >
-                <div className="min-w-0">
-                  <Link
-                    href={`/vehicles/${vehicle.id}`}
-                    className="text-sm font-medium hover:underline"
-                  >
-                    {vehicle.registration_number}
-                  </Link>
-                  <p className="text-muted-foreground truncate text-xs">
-                    {formatMiles(vehicle.current_odometer)} &middot; due on{" "}
-                    {vehicle.service_status?.reason === "mileage"
-                      ? "mileage"
-                      : vehicle.service_status?.reason === "both"
-                        ? "date and mileage"
-                        : "date"}
-                  </p>
-                </div>
-
-                {vehicle.service_status?.has_open_record ? (
-                  <Link
-                    href={`/services?vehicle_id=${vehicle.id}`}
-                    className="text-muted-foreground hover:text-foreground shrink-0 text-xs"
-                  >
-                    Record open
-                  </Link>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                    onClick={() => setOpeningFor(vehicle.id)}
-                  >
-                    Open record
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-
-      {openingFor !== null ? (
-        <NewServiceModal
-          open
-          onClose={() => setOpeningFor(null)}
-          vehicleId={openingFor}
-        />
-      ) : null}
+      <AttentionList
+        title="Overdue records"
+        allHref="/alerts"
+        allLabel="All alerts"
+        tone="overdue"
+        pending={alerts.isPending}
+        total={alerts.data?.total}
+        items={alerts.data?.items}
+        empty="Nothing has passed the grace period."
+        age={(service) =>
+          service.overdue_since
+            ? `${daysSince(service.overdue_since)}d overdue`
+            : "Overdue"
+        }
+      />
+      <AttentionList
+        title="Awaiting booking"
+        allHref="/services?status=due"
+        allLabel="All due"
+        tone="due"
+        pending={awaiting.isPending}
+        total={awaiting.data?.total}
+        items={awaiting.data?.items}
+        empty="Nothing is due and still inside its grace period."
+        age={(service) =>
+          service.due_since ? `due ${daysSince(service.due_since)}d` : "Due"
+        }
+      />
     </div>
+  );
+}
+
+function AttentionList({
+  title,
+  allHref,
+  allLabel,
+  tone,
+  pending,
+  total,
+  items,
+  empty,
+  age,
+}: {
+  title: string;
+  allHref: string;
+  allLabel: string;
+  tone: "overdue" | "due";
+  pending: boolean;
+  total: number | undefined;
+  items: ServiceRecord[] | undefined;
+  empty: string;
+  age: (service: ServiceRecord) => string;
+}) {
+  return (
+    <Card className={tone === "overdue" ? "border-overdue/30" : "border-due/30"}>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <Link
+          href={allHref}
+          className="text-muted-foreground hover:text-foreground text-xs"
+        >
+          {allLabel}
+          {total !== undefined && total > 5 ? ` (${total})` : ""}
+        </Link>
+      </CardHeader>
+      <CardContent className="p-0">
+        {pending ? (
+          <div className="p-4">
+            <Skeleton className="h-16 w-full" />
+          </div>
+        ) : null}
+
+        {items?.length === 0 ? (
+          <p className="text-muted-foreground p-4 text-sm">{empty}</p>
+        ) : null}
+
+        <ul className="divide-y">
+          {items?.map((service) => (
+            <li
+              key={service.id}
+              className="flex items-center justify-between gap-3 px-4 py-2.5"
+            >
+              <div className="min-w-0">
+                <Link
+                  href={`/services/${service.id}`}
+                  className="text-sm font-medium hover:underline"
+                >
+                  {service.vehicle.registration_number}
+                </Link>
+                <p className="text-muted-foreground truncate text-xs">
+                  {service.description}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-3">
+                <span
+                  className={cn(
+                    "text-xs font-medium tabular-nums",
+                    tone === "overdue" ? "text-overdue" : "text-due",
+                  )}
+                >
+                  {age(service)}
+                </span>
+                {/* Booking is the action that clears either list - and the
+                    one the API allows only a manager. */}
+                <TransitionButton service={service} isManager size="sm" />
+              </div>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
   );
 }
 

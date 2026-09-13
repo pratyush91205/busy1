@@ -86,18 +86,30 @@ def test_vehicle_counts_exclude_archived(
     assert body["vehicles"]["archived"] == 1
 
 
-def test_the_due_count_matches_the_due_filter(
+def test_the_due_count_is_vehicles_awaiting_booking(
     api: TestClient, manager: dict[str, str]
 ) -> None:
-    """Rule 3: the tile and the list must not disagree."""
-    due = make_vehicle(api, manager, registration_number="DUE001")
+    """Rule 3: the tile and the list behind it must not disagree.
+
+    A vehicle already booked has reached its interval too, but it is scheduled,
+    not waiting - counting it as due would put one vehicle in two tiles.
+    """
+    waiting = make_vehicle(api, manager, registration_number="DUE001")
     api.patch(
-        f"/vehicles/{due['id']}", json={"current_odometer": 61_000}, headers=manager
+        f"/vehicles/{waiting['id']}", json={"current_odometer": 61_000}, headers=manager
     )
+    booked = make_vehicle(api, manager, registration_number="BKD001")
+    api.patch(
+        f"/vehicles/{booked['id']}", json={"current_odometer": 61_000}, headers=manager
+    )
+    booked_record = api.get(
+        "/services", params={"vehicle_id": booked["id"]}, headers=manager
+    ).json()["items"][0]
+    advance_to(api, manager, booked_record["id"], "booked")
     make_vehicle(api, manager, registration_number="FINE01")
 
     body = dashboard(api, manager)
-    listed = api.get("/vehicles", params={"due": True}, headers=manager).json()
+    listed = api.get("/services", params={"status": "due"}, headers=manager).json()
 
     assert body["vehicles"]["due"] == 1
     assert body["vehicles"]["due"] == listed["total"]

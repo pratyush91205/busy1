@@ -41,7 +41,6 @@ def week_start(moment: datetime) -> date:
 
 def build(db: Session, *, grace_days: int, now: datetime) -> Summary:
     due_cycles.open_due_cycles(db, now)
-    today = now.astimezone(UTC).date()
     this_week = week_start(now)
     # Eight buckets ending with the current week, so the current one is the
     # eighth rather than a ninth.
@@ -53,7 +52,7 @@ def build(db: Session, *, grace_days: int, now: datetime) -> Summary:
     return Summary(
         vehicles={
             "total": dashboard_repository.live_vehicles(db),
-            "due": dashboard_repository.due_vehicles(db, today),
+            "due": dashboard_repository.due_vehicles(db),
             "in_service": dashboard_repository.vehicles_in_service(db),
             "archived": dashboard_repository.archived_vehicles(db),
         },

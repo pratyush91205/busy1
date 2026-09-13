@@ -26,7 +26,6 @@ from app.models import (
     Vehicle,
 )
 from app.repositories.alert import apply_alert_filters
-from app.repositories.vehicle import due_predicate
 
 # Eight ISO weeks ending with the current one - the current week is the eighth
 # bucket, not a ninth.
@@ -55,9 +54,23 @@ def archived_vehicles(db: Session) -> int:
     )
 
 
-def due_vehicles(db: Session, today: date) -> int:
-    """The same predicate GET /vehicles?due=true filters on."""
-    return count(db, select(func.count(Vehicle.id)).where(due_predicate(today)))
+def due_vehicles(db: Session) -> int:
+    """Vehicles whose current cycle is Due and not yet booked.
+
+    Not the raw interval predicate. A vehicle that falls due opens its own
+    cycle, so "interval reached" also covers vehicles already booked or in the
+    bay - and a vehicle in service counted as due as well sits in two tiles at
+    once. Overdue vehicles are included: overdue is a kind of due.
+    """
+    return count(
+        db,
+        select(func.count(func.distinct(ServiceRecord.vehicle_id)))
+        .join(Vehicle, Vehicle.id == ServiceRecord.vehicle_id)
+        .where(
+            ServiceRecord.status == ServiceStatus.DUE,
+            Vehicle.is_archived.is_(False),
+        ),
+    )
 
 
 def vehicles_in_service(db: Session) -> int:
