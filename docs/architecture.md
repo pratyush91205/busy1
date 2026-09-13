@@ -16,16 +16,30 @@ and the clock, so nothing needs keeping warm.
 
 ## Where each runs
 
-Locally for now — uvicorn and the production build (`next build`, then
-`next start`) against a Supabase project in ap-south-1 (Mumbai). `next dev`
-compiles each page on request, which on this machine meant seconds per page, so
-it is for editing only; the build bakes in the API address, so it is rebuilt
-when that changes. pytest runs against a local Postgres cluster instead,
-because the suite migrates its database up and down. Production is meant to be
-Render and Vercel; `render.yaml` pins Render to Singapore, the nearest region
-to the database, since every query is a round trip between the two and a
-request makes several (`decisions.md`, 31). All config is environment-driven,
-no hard-coded hosts. Not deployed yet.
+Production:
+
+- **Frontend** — Vercel, https://busy1-gamma.vercel.app, built from
+  `apps/web`.
+- **API** — Railway, https://api-production-d13f6.up.railway.app, built from
+  `apps/api` with Python pinned by `.python-version`. It runs in Singapore, the
+  nearest region to the database, since every query is a round trip between the
+  two and a request makes several (`decisions.md`, 31, 35).
+- **Database** — Supabase in ap-south-1 (Mumbai).
+
+Both hosts deploy on every push to `main`. Railway only switches to a new
+deploy once `/health` passes, and `/health` touches the database, so a deploy
+that can't reach Postgres never takes traffic. Migrations and the seed are run by
+hand, not on deploy.
+
+The API address is baked into the frontend at build time, so changing it means
+a Vercel redeploy. CORS allows the Vercel production origin and localhost only,
+so Vercel preview deployments can't sign in.
+
+Locally: uvicorn and the production build (`next build`, then `next start`)
+against the same Supabase project. `next dev` compiles each page on request,
+which on this machine meant seconds per page, so it is for editing only. pytest
+runs against a local Postgres cluster instead, because the suite migrates its
+database up and down. All config is environment-driven, no hard-coded hosts.
 
 ## Request path: completing a service
 
@@ -167,6 +181,11 @@ Five colours mean something (Due, Overdue, Booked, In Service, Completed), and
 they come from tokens rather than per-component classes, so a status looks the
 same in a badge, a row edge and the lifecycle rail. Every badge carries its
 text: colour alone isn't a label.
+
+The sign-in page offers the two seeded demo accounts as one-click sign-ins
+(`decisions.md`, 36). Its service-cycle illustration runs on sample figures in
+the browser, not the API — nobody is signed in to read data as — and holds still
+when the system asks for reduced motion.
 
 ## Not built
 

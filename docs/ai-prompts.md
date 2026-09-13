@@ -485,3 +485,67 @@ assistant's background tasks.
 Pages at 6–30ms on the production server, from localhost and the LAN address;
 the API answering CORS for both origins; and after restarting the API, a real
 sign-in through the LAN address.
+
+## Deployment
+
+### Prompt
+
+Deploy frontend on Vercel and backend on Railway.
+
+### What you got
+
+It read before creating anything: `render.yaml`, both env examples, the
+settings class, and whether Supabase was at the migration head with seed data
+in it. It was, so nothing needed migrating. It generated a new JWT secret rather
+than reusing the local one, created the Railway service empty so it was
+configured before its first build, and had Railway's agent move it from San
+Francisco to Singapore.
+
+### What you corrected
+
+Its first attempt was a `railway.json`. Railway's API refused it as deprecated,
+so the file was deleted in the next commit and the settings went on the service.
+It tried to create the Vercel project before the GitHub App could see the
+repository. I imported the project in the dashboard instead, under a Vercel
+login its connection couldn't see, so I set the API address there myself.
+
+### Verified rather than trusted
+
+`/health` on Railway returned `database: ok`. A CORS preflight from the Vercel
+origin came back allowed. Both demo accounts signed in against the live API. It
+also checked the live bundle for the API address instead of assuming the
+variable was set — the first Vercel build didn't have it.
+
+## Sign-in page
+
+### Prompt
+
+The sign-in page looks too simple and plain — make it more interactive and
+better looking, keep everything else the same, commit, have it reflect on
+Vercel, update the docs.
+
+### What you got
+
+A split screen. Left, the same form with show password, a Caps Lock warning, a
+spinner, a shake when the server refuses, and one-click demo sign-in. Right, a
+dark panel animating one service cycle: mileage runs out before time, the record
+goes Due to Completed, both counters reset, the odometer never goes back. It
+reused the app's tokens — the panel is the dark theme applied to one element —
+rather than adding colours.
+
+### What you corrected
+
+The odometer was first set in Geist Mono, which spaces a comma like a digit —
+"20 , 400" on the screenshot. Switched to the sans with tabular figures. Kept the
+demo buttons even though they put a password in the bundle, with the condition
+written down (`decisions.md`, 36).
+
+### Verified rather than trusted
+
+Type-check, lint and the production build pass. Against the production build in
+the browser: the cycle animates to Due and then Booked; an empty submit shows
+both field errors; the eye switches the field to text and back; Caps Lock shows
+its warning; a demo button fills the form and submits, and the refusal shows
+with the shake. Those interactions were driven by script because the extension's
+clicks didn't register. The 400px layout isn't checked — the window wouldn't
+resize.

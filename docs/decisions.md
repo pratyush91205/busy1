@@ -8,7 +8,7 @@
   with the app already written is how this fails.
 - **Later reversed:** three cloud accounts before there was anything to show was
   the wrong use of the budget. Kept from it: all config is environment-driven
-  and the API won't start without it, `render.yaml` is committed, the frontend
+  and the API won't start without it, a `render.yaml` (replaced in 35), the frontend
   reads `NEXT_PUBLIC_API_BASE_URL`. Trade-off: if deployment goes wrong now, it
   goes wrong late.
 
@@ -364,3 +364,30 @@
   tile links to. The overdue tile still equals the alert badge (25). Trade-off:
   the tile no longer matches the fleet list's "due" filter, which still means
   interval reached.
+
+## Decision 35
+
+- **Chose:** Railway for the API, in Singapore, with its start command, health
+  check, restart policy and region set on the service. Vercel for the frontend.
+  Reverses Render (31) and deletes `render.yaml`.
+- **Rejected:** Render from `render.yaml`; a `railway.json` in the repository.
+- **Why:** Railway and Vercel were both connected to the assistant, so the
+  deploy could be created and checked from one session — health check, CORS
+  preflight and a real sign-in against the live API. Render's free tier also
+  sleeps when idle, which makes a reviewer's first load slow. `railway.json` was
+  the first attempt; Railway's API refused it because config-as-code is
+  deprecated, so the settings live on the service. Trade-off: the API's deploy
+  settings aren't in the repository any more — rebuilding the service means
+  following `architecture.md`, not applying a file — and Railway bills by usage
+  where Render had a free plan.
+
+## Decision 36
+
+- **Chose:** one-click sign-in for the two seeded demo accounts on the login
+  page.
+- **Rejected:** credentials listed only in `SUBMISSION.md`.
+- **Why:** a reviewer's first minutes are signing in as each role, and typing
+  an address and password twice says nothing about the system. The accounts are
+  public already and only get what the server allows their role. Trade-off: the
+  password ships in the browser bundle, so this is only right while every
+  account is a seeded demo account. A real deployment removes the list.

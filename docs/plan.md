@@ -15,7 +15,9 @@ Two hours a day, one phase each, specced in `.claude/specs/` before being built.
 | 7 | Bulk odometer upload and export | 2h 00 | 2h 00 |
 | 8 | Dashboard and seed data | 2h 00 | 2h 00 |
 | 9 | Frontend experience | 2h 30 | 3h 00 |
-| | Total | 18h 30 | 21h 05 |
+| 10 | Deployment | 1h 00 | 0h 45 |
+| 11 | Sign-in page | 0h 45 | 0h 45 |
+| | Total | 20h 15 | 22h 35 |
 
 ## Order
 
@@ -119,19 +121,34 @@ per request, so it wasn't the code. The pages were — 6–8 seconds each and 49
 its 7.7 free. Served the production build instead: 6–30ms a page. Nothing in the
 repository changed.
 
+Session 10, deployment, under estimate. Config had been environment-driven from
+the start and the database was already migrated and seeded, so the deploy only
+had to ship code. The API went to Railway instead of Render (`decisions.md`,
+35). What cost time was the platforms, not the code: Railway refused
+`railway.json` as deprecated, so the settings went on the service; Vercel
+couldn't see the repository until its GitHub App was installed; and the Vercel
+project was imported under a login the assistant couldn't reach, so its API
+address had to be set in the dashboard by hand. CORS was set once Vercel had
+given the real URL, not guessed.
+
+Session 11, the sign-in page — the plainest screen in the app and the first one
+a reviewer sees. Redesigned without changing anything behind it: same form,
+validation and errors. Added show password, a Caps Lock warning, a shake on a
+refused sign-in, one-click demo accounts (`decisions.md`, 36), and an
+illustration of one service cycle.
+
 ## Cut
 
 Nothing cut from the ten goals.
 
 Deployment moved from phase 2 to the end of the build (trade-off in
-`decisions.md`). Already done for it: `render.yaml`, environment-driven config,
-no hard-coded hosts.
+`decisions.md`, 1). Done in session 10, on Vercel and Railway.
 
 If time runs short: Playwright tests go first, then UI polish, then CSV export
 conveniences. Not cut: authorization, lifecycle validation, due/overdue
 correctness, audit trail, per-row bulk reporting.
 
-Over the 12-hour estimate by about nine hours. The overrun is mostly three
+Over the 12-hour estimate by about ten and a half hours. The overrun is mostly three
 things: a schema change mid-spec in session 6, the size of session 5 —
 records, assignment, lifecycle and audit had to be one piece because every
 mutation writes its audit event in the same transaction — and session 9,
