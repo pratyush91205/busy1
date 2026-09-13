@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, case, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import ServiceNote, ServiceRecord, ServiceStatus, ServiceTechnician
@@ -19,9 +19,20 @@ from app.schemas.pagination import PageParams
 from app.schemas.service import ServiceSort
 from app.schemas.vehicle import SortOrder
 
+# Status sorts by where it sits in the lifecycle, not alphabetically. Sorting
+# the stored strings puts Booked before Due and Completed before In Service,
+# which is a list that looks sorted and reads as random.
+LIFECYCLE_ORDER = case(
+    (ServiceRecord.status == ServiceStatus.DUE, 0),
+    (ServiceRecord.status == ServiceStatus.BOOKED, 1),
+    (ServiceRecord.status == ServiceStatus.IN_SERVICE, 2),
+    (ServiceRecord.status == ServiceStatus.COMPLETED, 3),
+    else_=4,
+)
+
 SORT_COLUMNS = {
     ServiceSort.SCHEDULED_DATE: ServiceRecord.scheduled_date,
-    ServiceSort.STATUS: ServiceRecord.status,
+    ServiceSort.STATUS: LIFECYCLE_ORDER,
     ServiceSort.UPDATED_AT: ServiceRecord.updated_at,
 }
 

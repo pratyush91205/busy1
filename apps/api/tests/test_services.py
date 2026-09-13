@@ -319,3 +319,27 @@ def test_filtering_by_technician_does_not_duplicate_multi_technician_records(
     assert len(listed["items"]) == 1
     assert len(listed["items"][0]["technicians"]) == 2
 
+
+def test_sorting_by_status_follows_the_lifecycle_not_the_alphabet(
+    api: TestClient, manager: dict[str, str], vehicle: dict, service: dict
+) -> None:
+    """Alphabetically booked < completed < due < in_service - sorted, and useless."""
+    for registration, target in [
+        ("VAN002", "booked"),
+        ("VAN003", "in_service"),
+        ("VAN004", "completed"),
+    ]:
+        other = make_vehicle(api, manager, registration_number=registration)
+        record = make_service(api, manager, other["id"], f"{target} work")
+        advance_to(api, manager, record["id"], target)
+
+    ascending = api.get(
+        "/services", params={"sort": "status", "order": "asc"}, headers=manager
+    ).json()
+    descending = api.get(
+        "/services", params={"sort": "status", "order": "desc"}, headers=manager
+    ).json()
+
+    lifecycle = ["due", "booked", "in_service", "completed"]
+    assert [item["status"] for item in ascending["items"]] == lifecycle
+    assert [item["status"] for item in descending["items"]] == lifecycle[::-1]
