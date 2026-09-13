@@ -23,11 +23,13 @@ import logging
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import User
 from app.repositories import vehicle as vehicle_repository
 from app.schemas.vehicle import normalise_registration
+from app.services import due_cycles, maintenance
 from app.services.errors import ConflictError, DomainError
 
 logger = logging.getLogger(__name__)
@@ -206,16 +208,33 @@ def apply_row(
         )
 
     vehicle.current_odometer = reading
-    # Committed per row on purpose: see the module docstring. A reading is not
-    # a service, so service_baseline_odometer is untouched and this cannot make
-    # a vehicle stop being due.
-    db.commit()
+    try:
+        # A reading that crosses the mileage interval opens the vehicle's next
+        # cycle in this row's commit: the reading and the Due record it caused
+        # land together or not at all.
+        opened = due_cycles.open_cycle_if_due(db, vehicle, maintenance.utc_now())
+        # Committed per row on purpose: see the module docstring. A reading is
+        # not a service, so service_baseline_odometer is untouched and this
+        # cannot make a vehicle stop being due.
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return rejected(
+            row_number,
+            registration,
+            "Another change to this vehicle landed at the same moment. "
+            "Upload this row again.",
+        )
+
+    message = f"Updated to {reading}."
+    if opened is not None:
+        message += f" Now due for service - cycle {opened.cycle_number} opened."
 
     return RowResult(
         row=row_number,
         registration_number=registration,
         status=RowStatus.SUCCESS,
-        message=f"Updated to {reading}.",
+        message=message,
         previous_odometer=previous,
         new_odometer=reading,
     )

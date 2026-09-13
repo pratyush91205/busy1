@@ -35,6 +35,7 @@ from app.repositories import vehicle as vehicle_repository
 from app.schemas.pagination import PageParams
 from app.schemas.service import ServiceSort, TransitionRequest
 from app.schemas.vehicle import SortOrder
+from app.services import due_cycles
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError
 from app.services.lifecycle import validate_transition
 
@@ -71,6 +72,11 @@ def list_services(
     everything and dropping rows afterwards - which would also make `total`
     and the page size lie.
     """
+    if now is not None:
+        # A vehicle whose date interval landed since anyone last looked has its
+        # cycle opened before the list is read, so the list is never behind.
+        due_cycles.open_due_cycles(db, now)
+
     if actor.role == UserRole.TECHNICIAN:
         technician_id = actor.id
 

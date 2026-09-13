@@ -24,7 +24,7 @@ from app.models import ServiceRecord, ServiceStatus
 from app.repositories import service as service_repository
 from app.schemas.service import ServiceSort
 from app.schemas.vehicle import SortOrder
-from app.services import maintenance
+from app.services import due_cycles, maintenance
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,10 @@ def stream_csv(
     overdue: bool | None = None,
 ) -> Iterator[str]:
     """Yield the export one row at a time, header first."""
+    # A vehicle whose date interval landed since anyone last looked belongs in
+    # the history too, so its cycle is opened before the first row is read.
+    due_cycles.open_due_cycles(db, now)
+
     buffer = io.StringIO()
     writer = csv.writer(buffer)
 

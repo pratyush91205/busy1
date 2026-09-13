@@ -14,7 +14,7 @@ from app.models import User, Vehicle
 from app.repositories import vehicle as vehicle_repository
 from app.schemas.pagination import PageParams
 from app.schemas.vehicle import SortOrder, VehicleCreate, VehicleSort, VehicleUpdate
-from app.services import maintenance
+from app.services import due_cycles, maintenance
 from app.services.errors import ConflictError, NotFoundError
 
 logger = logging.getLogger(__name__)
@@ -31,6 +31,9 @@ def list_vehicles(
     due: bool | None = None,
     today=None,
 ) -> tuple[list[Vehicle], int]:
+    # has_open_record on each row has to reflect cycles whose date interval
+    # landed since the last read.
+    due_cycles.open_due_cycles(db, maintenance.utc_now())
     return vehicle_repository.list_page(
         db,
         params=params,
@@ -101,6 +104,10 @@ def update_vehicle(
 
     for field, value in changes.items():
         setattr(vehicle, field, value)
+
+    # A higher reading or a shorter interval can make the vehicle due right
+    # now; if so its cycle opens in this same commit.
+    due_cycles.open_cycle_if_due(db, vehicle, maintenance.utc_now())
 
     db.commit()
     db.refresh(vehicle)

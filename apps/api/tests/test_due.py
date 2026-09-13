@@ -163,7 +163,10 @@ def test_completing_a_service_resets_both_counters(
     due_now = api.get(f"/vehicles/{created['id']}", headers=manager).json()
     assert due_now["service_status"]["is_due"] is True
 
-    service = make_service(api, manager, created["id"])
+    # Driving past the interval opened the cycle; nobody opens it by hand.
+    service = api.get(
+        "/services", params={"vehicle_id": created["id"]}, headers=manager
+    ).json()["items"][0]
     advance_to(api, manager, service["id"], "completed", completion_odometer=61_000)
 
     after = api.get(f"/vehicles/{created['id']}", headers=manager).json()

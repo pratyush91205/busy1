@@ -178,9 +178,8 @@ def seed_fleet(db: Session, manager: User, technicians: list[User]) -> None:
 
     dismiss(db, first_overdue, manager)
 
-    # Push two vehicles past their mileage interval so the fleet has vehicles
-    # that are due with no record open yet - the state that prompts a manager
-    # to act.
+    # Push two vehicles past their mileage interval. Each opens its own Due
+    # cycle on the reading that crosses it - nobody opens those by hand.
     drive_past_interval(db, vehicles[9], manager)
     drive_past_interval(db, vehicles[10], manager)
 

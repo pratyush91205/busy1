@@ -15,7 +15,7 @@ from app.models import OverdueAlertDismissal, ServiceRecord, User
 from app.repositories import alert as alert_repository
 from app.repositories import service as service_repository
 from app.schemas.pagination import PageParams
-from app.services import maintenance
+from app.services import due_cycles, maintenance
 from app.services.errors import ConflictError, NotFoundError
 
 logger = logging.getLogger(__name__)
@@ -24,12 +24,16 @@ logger = logging.getLogger(__name__)
 def list_alerts(
     db: Session, *, params: PageParams, grace_days: int, now: datetime
 ) -> tuple[list[ServiceRecord], int]:
+    # A vehicle left unbooked past its date interval must alert even if nobody
+    # has opened its record - that is the vehicle the alert exists for.
+    due_cycles.open_due_cycles(db, now)
     return alert_repository.list_alerts(
         db, params=params, grace_days=grace_days, now=now
     )
 
 
 def count_alerts(db: Session, *, grace_days: int, now: datetime) -> int:
+    due_cycles.open_due_cycles(db, now)
     return alert_repository.count_alerts(db, grace_days=grace_days, now=now)
 
 

@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.models import ServiceStatus
 from app.repositories import dashboard as dashboard_repository
+from app.services import due_cycles
 
 WEEKS = dashboard_repository.WEEKS
 
@@ -39,6 +40,7 @@ def week_start(moment: datetime) -> date:
 
 
 def build(db: Session, *, grace_days: int, now: datetime) -> Summary:
+    due_cycles.open_due_cycles(db, now)
     today = now.astimezone(UTC).date()
     this_week = week_start(now)
     # Eight buckets ending with the current week, so the current one is the
