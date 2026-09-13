@@ -209,11 +209,18 @@ def transition(
     validate_transition(service.status, target)
     require_permitted_transition(db, service, target, actor)
 
+    if request.technician_id is not None and target is not ServiceStatus.BOOKED:
+        raise ConflictError(
+            "A technician is named when booking. To change who is assigned "
+            "after that, use the assignment endpoints."
+        )
+
     metadata: dict = {}
 
     if target is ServiceStatus.BOOKED:
         if request.scheduled_date is None:
             raise ConflictError("Booking a service requires a scheduled date.")
+        book_technician(db, service, request.technician_id, actor, metadata)
         service.scheduled_date = request.scheduled_date
         metadata["scheduled_date"] = request.scheduled_date.isoformat()
 
@@ -273,6 +280,33 @@ def complete(
     metadata["completion_odometer"] = request.completion_odometer
 
 
+
+def book_technician(
+    db: Session,
+    service: ServiceRecord,
+    technician_id: int | None,
+    actor: User,
+    metadata: dict,
+) -> None:
+    """The technician half of booking, inside the caller's transaction.
+
+    Booking assigns a scheduled date *and* a technician, so a record cannot be
+    booked with nobody on it. The technician can be named in the booking -
+    assigned here, with its own audit event landing ahead of the status change -
+    or already be assigned.
+    """
+    if technician_id is not None:
+        if not service_repository.is_assigned(db, service.id, technician_id):
+            add_assignment(db, service.id, technician_id, actor)
+        metadata["technician_id"] = technician_id
+        return
+
+    if not service.technicians:
+        raise ConflictError(
+            "Booking a service requires a technician. Name one when booking, "
+            "or assign one to the record first."
+        )
+
 # --- assignment --------------------------------------------------------------
 
 
@@ -282,30 +316,7 @@ def assign_technician(
     service = get_service(db, service_id, actor)
     require_open_for_assignment(service)
 
-    technician = user_repository.get_by_id(db, technician_id)
-    if technician is None:
-        raise NotFoundError(f"No user with id {technician_id}")
-
-    if technician.role != UserRole.TECHNICIAN:
-        raise ConflictError(
-            f"{technician.full_name} is a {technician.role} and cannot be "
-            "assigned to service work."
-        )
-
-    if service_repository.is_assigned(db, service_id, technician_id):
-        raise ConflictError(
-            f"{technician.full_name} is already assigned to this service record."
-        )
-
-    db.add(ServiceTechnician(service_id=service_id, technician_id=technician_id))
-    audit_repository.record(
-        db,
-        service_id=service_id,
-        actor_id=actor.id,
-        event_type=AuditEventType.TECHNICIAN_ASSIGNED,
-        new_value=str(technician_id),
-        metadata={"technician_name": technician.full_name},
-    )
+    technician = add_assignment(db, service_id, technician_id, actor, strict=True)
 
     db.commit()
     logger.info(
@@ -349,6 +360,47 @@ def unassign_technician(
         actor.id,
     )
 
+
+
+def add_assignment(
+    db: Session,
+    service_id: int,
+    technician_id: int,
+    actor: User,
+    *,
+    strict: bool = False,
+) -> User:
+    """Assign one technician and record it, without committing.
+
+    Shared by the assignment endpoint and by booking, so the two cannot
+    disagree about who may be assigned or what the timeline says. ``strict``
+    refuses a technician who is already assigned; booking checks that itself.
+    """
+    technician = user_repository.get_by_id(db, technician_id)
+    if technician is None:
+        raise NotFoundError(f"No user with id {technician_id}")
+
+    if technician.role != UserRole.TECHNICIAN:
+        raise ConflictError(
+            f"{technician.full_name} is a {technician.role} and cannot be "
+            "assigned to service work."
+        )
+
+    if strict and service_repository.is_assigned(db, service_id, technician_id):
+        raise ConflictError(
+            f"{technician.full_name} is already assigned to this service record."
+        )
+
+    db.add(ServiceTechnician(service_id=service_id, technician_id=technician_id))
+    audit_repository.record(
+        db,
+        service_id=service_id,
+        actor_id=actor.id,
+        event_type=AuditEventType.TECHNICIAN_ASSIGNED,
+        new_value=str(technician_id),
+        metadata={"technician_name": technician.full_name},
+    )
+    return technician
 
 # --- notes -------------------------------------------------------------------
 

@@ -43,12 +43,15 @@ class ServiceUpdate(BaseModel):
 class TransitionRequest(BaseModel):
     """One endpoint for the whole lifecycle; the target status is data.
 
-    The two extra fields are required by exactly one target each and validated
-    against it in the service layer, where the transition table already lives.
+    The extra fields each belong to one target and are validated against it in
+    the service layer, where the transition table already lives. Booking takes
+    a scheduled date and a technician - the technician optional only when the
+    record already has one - and completing takes the closing odometer.
     """
 
     status: ServiceStatus
     scheduled_date: date | None = None
+    technician_id: int | None = None
     completion_odometer: int | None = Field(default=None, ge=0)
 
     model_config = ConfigDict(extra="forbid")

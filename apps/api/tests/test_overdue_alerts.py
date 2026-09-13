@@ -73,7 +73,7 @@ def test_booking_stops_it_being_overdue(
     age(clean_db, service["id"], GRACE + 30)
     assert api.get(f"/services/{service['id']}", headers=manager).json()["is_overdue"]
 
-    move(api, manager, service["id"], "booked", scheduled_date="2026-10-01")
+    advance_to(api, manager, service["id"], "booked")
 
     assert api.get(f"/services/{service['id']}", headers=manager).json()["is_overdue"] is False
 

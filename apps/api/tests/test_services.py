@@ -289,7 +289,7 @@ def test_filtering_by_vehicle_status_and_search(
 ) -> None:
     second = make_vehicle(api, manager, registration_number="VAN002")
     other = make_service(api, manager, second["id"], "Tyre change")
-    move(api, manager, other["id"], "booked", scheduled_date="2026-10-01")
+    advance_to(api, manager, other["id"], "booked")
 
     by_vehicle = api.get(
         "/services", params={"vehicle_id": vehicle["id"]}, headers=manager
@@ -318,3 +318,4 @@ def test_filtering_by_technician_does_not_duplicate_multi_technician_records(
     assert listed["total"] == 1
     assert len(listed["items"]) == 1
     assert len(listed["items"][0]["technicians"]) == 2
+

@@ -106,8 +106,7 @@ def test_the_due_count_matches_the_due_filter(
 def test_in_service_counts_vehicles_not_records(
     api: TestClient, manager: dict[str, str], vehicle: dict, service: dict
 ) -> None:
-    move(api, manager, service["id"], "booked", scheduled_date="2026-10-01")
-    move(api, manager, service["id"], "in_service")
+    advance_to(api, manager, service["id"], "in_service")
 
     body = dashboard(api, manager)
 

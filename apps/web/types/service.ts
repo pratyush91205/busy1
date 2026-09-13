@@ -89,5 +89,7 @@ export interface ServiceQuery {
 export interface TransitionInput {
   status: ServiceStatus;
   scheduled_date?: string;
+  /** Booking assigns a technician as well as a date. */
+  technician_id?: number;
   completion_odometer?: number;
 }

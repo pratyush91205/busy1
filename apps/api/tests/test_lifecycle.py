@@ -22,10 +22,15 @@ STATUSES = [status.value for status in ServiceStatus]
 
 LEGAL = {("due", "booked"), ("booked", "in_service"), ("in_service", "completed")}
 
-EXTRA_FOR = {
-    "booked": {"scheduled_date": "2026-10-01"},
-    "completed": {"completion_odometer": 60_000},
-}
+def extra_for(api: TestClient, manager: dict[str, str], target: str) -> dict:
+    """What each target needs: a date and a technician to book, an odometer to
+    complete."""
+    if target == "booked":
+        roster = api.get("/technicians", headers=manager).json()
+        return {"scheduled_date": "2026-10-01", "technician_id": roster[0]["id"]}
+    if target == "completed":
+        return {"completion_odometer": 60_000}
+    return {}
 
 
 @pytest.mark.parametrize(("start", "target"), sorted(LEGAL))
@@ -36,7 +41,7 @@ def test_every_legal_transition_is_allowed(
     if start != "due":
         advance_to(api, manager, service["id"], start)
 
-    response = move(api, manager, service["id"], target, **EXTRA_FOR.get(target, {}))
+    response = move(api, manager, service["id"], target, **extra_for(api, manager, target))
 
     assert response.status_code == 200, response.text
     assert response.json()["status"] == target
@@ -53,7 +58,7 @@ def test_every_other_transition_is_refused(
     if start != "due":
         advance_to(api, manager, service["id"], start)
 
-    response = move(api, manager, service["id"], target, **EXTRA_FOR.get(target, {}))
+    response = move(api, manager, service["id"], target, **extra_for(api, manager, target))
 
     assert response.status_code == 409, f"{start} -> {target} was allowed"
     # The message has to name both states, or the client learns nothing.
@@ -81,13 +86,94 @@ def test_booking_without_a_date_is_refused(
 
 
 def test_booking_records_the_scheduled_date(
-    api: TestClient, manager: dict[str, str], service: dict
+    api: TestClient, manager: dict[str, str], people: dict[str, int], service: dict
 ) -> None:
     response = move(
-        api, manager, service["id"], "booked", scheduled_date="2026-10-01"
+        api,
+        manager,
+        service["id"],
+        "booked",
+        scheduled_date="2026-10-01",
+        technician_id=people["tech"],
     )
 
     assert response.json()["scheduled_date"] == "2026-10-01"
+
+
+def test_booking_without_a_technician_is_refused(
+    api: TestClient, manager: dict[str, str], service: dict
+) -> None:
+    """Goal 4: booking assigns a date *and* a technician."""
+    response = move(api, manager, service["id"], "booked", scheduled_date="2026-10-01")
+
+    assert response.status_code == 409
+    assert "technician" in response.json()["detail"].lower()
+    unchanged = api.get(f"/services/{service['id']}", headers=manager).json()
+    assert unchanged["status"] == "due"
+
+
+def test_booking_with_a_technician_assigns_them_in_the_same_transaction(
+    api: TestClient, manager: dict[str, str], people: dict[str, int], service: dict
+) -> None:
+    response = move(
+        api,
+        manager,
+        service["id"],
+        "booked",
+        scheduled_date="2026-10-01",
+        technician_id=people["tech"],
+    )
+
+    assert response.status_code == 200, response.text
+    assert [t["id"] for t in response.json()["technicians"]] == [people["tech"]]
+    timeline = api.get(f"/services/{service['id']}/timeline", headers=manager).json()
+    # Assigned, then booked - in the order it happened.
+    assert [e["event_type"] for e in timeline][-2:] == [
+        "technician_assigned",
+        "status_changed",
+    ]
+
+
+def test_a_record_that_already_has_a_technician_books_without_naming_one(
+    api: TestClient, manager: dict[str, str], people: dict[str, int], service: dict
+) -> None:
+    assign(api, manager, service["id"], people["tech"])
+
+    response = move(api, manager, service["id"], "booked", scheduled_date="2026-10-01")
+
+    assert response.status_code == 200, response.text
+
+
+def test_naming_an_assigned_technician_when_booking_does_not_duplicate_them(
+    api: TestClient, manager: dict[str, str], people: dict[str, int], service: dict
+) -> None:
+    assign(api, manager, service["id"], people["tech"])
+
+    response = move(
+        api,
+        manager,
+        service["id"],
+        "booked",
+        scheduled_date="2026-10-01",
+        technician_id=people["tech"],
+    )
+
+    assert response.status_code == 200, response.text
+    assert len(response.json()["technicians"]) == 1
+
+
+def test_a_technician_can_only_be_named_when_booking(
+    api: TestClient, manager: dict[str, str], people: dict[str, int], service: dict
+) -> None:
+    """Any other move naming one would be a reassignment through the wrong door."""
+    advance_to(api, manager, service["id"], "booked")
+
+    response = move(
+        api, manager, service["id"], "in_service", technician_id=people["other_tech"]
+    )
+
+    assert response.status_code == 409
+    assert "booking" in response.json()["detail"].lower()
 
 
 # --- completion --------------------------------------------------------------

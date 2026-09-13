@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from .conftest_services import assign, move
+from .conftest_services import advance_to, assign, move
 
 
 def timeline(api: TestClient, headers: dict[str, str], service_id: int) -> list[dict]:
@@ -98,9 +98,7 @@ def test_adding_a_note_is_recorded(
 def test_completion_records_the_odometer(
     api: TestClient, manager: dict[str, str], service: dict
 ) -> None:
-    move(api, manager, service["id"], "booked", scheduled_date="2026-10-01")
-    move(api, manager, service["id"], "in_service")
-    move(api, manager, service["id"], "completed", completion_odometer=61_500)
+    advance_to(api, manager, service["id"], "completed", completion_odometer=61_500)
 
     completed = [
         e

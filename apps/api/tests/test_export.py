@@ -99,7 +99,7 @@ def test_filters_narrow_the_export(
     """Rule 12: the same filters as the list, so "export what I see" works."""
     second = make_vehicle(api, manager, registration_number="VAN002")
     other = make_service(api, manager, second["id"], "Tyre change")
-    move(api, manager, other["id"], "booked", scheduled_date="2026-10-01")
+    advance_to(api, manager, other["id"], "booked")
 
     by_vehicle = rows(api.get(PATH, params={"vehicle_id": vehicle["id"]}, headers=manager))
     by_status = rows(api.get(PATH, params={"status": "booked"}, headers=manager))

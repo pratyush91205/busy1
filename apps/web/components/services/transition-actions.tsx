@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
+import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
 import { useTransition } from "@/hooks/use-services";
+import { useTechnicians } from "@/hooks/use-technicians";
 import { useVehicle } from "@/hooks/use-vehicles";
 import { formatMiles } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -78,11 +80,16 @@ export function TransitionButton({
   const [open, setOpen] = useState(false);
   const [scheduledDate, setScheduledDate] = useState("");
   const [odometer, setOdometer] = useState("");
+  const [technicianId, setTechnicianId] = useState("");
 
   const next = NEXT[service.status];
   // Only loaded when it is about to be needed: the completion dialog shows the
   // reading the new one has to beat.
   const vehicle = useVehicle(service.vehicle.id, open && next === "completed");
+  // Booking assigns a technician as well as a date. Only a manager books, and
+  // only a manager may read the roster.
+  const roster = useTechnicians(isManager && open && next === "booked");
+  const assignedNames = service.technicians.map((t) => t.full_name).join(", ");
 
   if (next === null || !mayTransition(service.status, isManager)) return null;
 
@@ -94,7 +101,12 @@ export function TransitionButton({
     move.mutate(
       {
         status: next,
-        ...(next === "booked" ? { scheduled_date: scheduledDate } : {}),
+        ...(next === "booked"
+          ? {
+              scheduled_date: scheduledDate,
+              ...(technicianId ? { technician_id: Number(technicianId) } : {}),
+            }
+          : {}),
         ...(next === "completed"
           ? { completion_odometer: Number(odometer) }
           : {}),
@@ -104,6 +116,7 @@ export function TransitionButton({
           setOpen(false);
           setScheduledDate("");
           setOdometer("");
+          setTechnicianId("");
           toast(
             updated.status === "completed"
               ? "Service completed - the next cycle counts from here"
@@ -142,7 +155,7 @@ export function TransitionButton({
         title={next === "booked" ? "Book this service" : "Complete this service"}
         description={
           next === "booked"
-            ? "A booked service needs a date. Booking also stops the overdue clock for this cycle."
+            ? "Booking sets the date and who does the work. It also stops the overdue clock for this cycle."
             : "The completion reading becomes the vehicle's odometer and starts the next mileage interval. It cannot be lower than the vehicle's current reading."
         }
       >
@@ -154,17 +167,45 @@ export function TransitionButton({
           }}
         >
           {next === "booked" ? (
-            <div className="space-y-1.5">
-              <Label htmlFor="scheduled_date">Scheduled date</Label>
-              <Input
-                id="scheduled_date"
-                type="date"
-                required
-                className="h-9"
-                value={scheduledDate}
-                onChange={(event) => setScheduledDate(event.target.value)}
-              />
-            </div>
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="scheduled_date">Scheduled date</Label>
+                <Input
+                  id="scheduled_date"
+                  type="date"
+                  required
+                  className="h-9"
+                  value={scheduledDate}
+                  onChange={(event) => setScheduledDate(event.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="booking_technician">Technician</Label>
+                <Select
+                  id="booking_technician"
+                  // Required only when nobody is assigned yet - the server
+                  // refuses a booking with no technician on the record.
+                  required={service.technicians.length === 0}
+                  value={technicianId}
+                  onChange={(event) => setTechnicianId(event.target.value)}
+                  className="h-9 w-full"
+                >
+                  <option value="">
+                    {service.technicians.length > 0
+                      ? `Keep ${assignedNames}`
+                      : roster.isPending
+                        ? "Loading technicians…"
+                        : "Choose a technician"}
+                  </option>
+                  {roster.data?.map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {person.full_name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </>
           ) : (
             <div className="space-y-1.5">
               <Label htmlFor="completion_odometer">Completion odometer</Label>

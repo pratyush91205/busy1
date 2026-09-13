@@ -134,8 +134,11 @@ def advance_to(
     vehicle's current odometer - a test that has driven the van first has to
     say so.
     """
+    # Booking assigns a technician as well as a date, so name the first one on
+    # the roster. A record that already has them is not assigned twice.
+    roster = api.get("/technicians", headers=manager).json()
     steps = [
-        ("booked", {"scheduled_date": "2026-10-01"}),
+        ("booked", {"scheduled_date": "2026-10-01", "technician_id": roster[0]["id"]}),
         ("in_service", {}),
         ("completed", {"completion_odometer": completion_odometer}),
     ]
