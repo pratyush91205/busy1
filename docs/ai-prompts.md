@@ -456,3 +456,32 @@ the system opened, with a null actor on the timeline; booking one with nobody
 assigned is refused 409 with the reason; status sorts in lifecycle order across
 all 15 records; and the dashboard's due tile equals the number of vehicles with
 a Due record. The browser walkthrough is still not done.
+
+## The app is slow again
+
+### Prompt
+
+The application has become too slow.
+
+### What you got
+
+Measurement before any change: every API endpoint timed twice, queries counted
+per request, free memory and processes listed, pages timed. The obvious suspect
+was the due-cycle sweep from the previous session, since it runs on reads. It
+cost one query, 30–60ms. The pages were the problem — 6–8 seconds each and 49
+for `/login` from `next dev`, on a machine with 0.8 GB free.
+
+### What you corrected
+
+Nothing in the code. Switched from the dev server to the production build. The
+API address is baked in at build time, so the build looks up the Wi-Fi address
+first, or the site would work on this machine and nowhere else. The host later
+stopped both servers for low memory — the web server survived, the API didn't —
+so the lasting fix is running them in my own terminals rather than as the
+assistant's background tasks.
+
+### Verified rather than trusted
+
+Pages at 6–30ms on the production server, from localhost and the LAN address;
+the API answering CORS for both origins; and after restarting the API, a real
+sign-in through the LAN address.

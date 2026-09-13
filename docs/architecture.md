@@ -16,8 +16,11 @@ and the clock, so nothing needs keeping warm.
 
 ## Where each runs
 
-Locally for now — uvicorn and `next dev` against a Supabase project in
-ap-south-1 (Mumbai). pytest runs against a local Postgres cluster instead,
+Locally for now — uvicorn and the production build (`next build`, then
+`next start`) against a Supabase project in ap-south-1 (Mumbai). `next dev`
+compiles each page on request, which on this machine meant seconds per page, so
+it is for editing only; the build bakes in the API address, so it is rebuilt
+when that changes. pytest runs against a local Postgres cluster instead,
 because the suite migrates its database up and down. Production is meant to be
 Render and Vercel; `render.yaml` pins Render to Singapore, the nearest region
 to the database, since every query is a round trip between the two and a

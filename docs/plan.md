@@ -112,6 +112,13 @@ that changed too (`decisions.md`, 32–34). 257 tests pass, 13 of them new; five
 existing ones broke, every one by booking a record with nobody on it — the new
 rule doing its job.
 
+After the audit the app was slow again. Measured before changing anything: the
+API answered in 0.14–0.9s, and the due-cycle sweep added on reads cost one query
+per request, so it wasn't the code. The pages were — 6–8 seconds each and 49 for
+`/login` — because `next dev` compiles on request and the machine had 0.8 GB of
+its 7.7 free. Served the production build instead: 6–30ms a page. Nothing in the
+repository changed.
+
 ## Cut
 
 Nothing cut from the ten goals.
@@ -132,3 +139,12 @@ which was frontend work the first eight sessions had deferred.
 
 Still open: the browser walkthrough of both roles, the narrow-screen check and
 the keyboard pass, all blocked on tooling rather than on the code.
+
+Also still open, from an assessment against the brief — both met on the server,
+only partly in the interface:
+
+- Goal 5. A technician has no navigation to the one list of every record
+  assigned to them. The list exists at `/services`, but their nav links only My
+  work, which shows open work and the last five completed.
+- Goal 9. The timeline records that a note was added, with who and when, but
+  not the note itself; that sits in the Notes panel on the same page.
