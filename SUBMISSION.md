@@ -3,7 +3,7 @@
 ## Links
 
 - **GitHub repository:** https://github.com/pratyush91205/busy1
-- **Live application:** https://busy1-gamma.vercel.app
+- **Live application:** https://busy1-gamma.vercel.app/login
 - **Backend Deployment link:** https://api-production-d13f6.up.railway.app/docs
 
 ## Notes for the reviewer
