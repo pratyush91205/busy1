@@ -187,6 +187,22 @@
   }
 }
 
+/* A refused sign-in. Motion that answers the submit, not decoration. */
+@keyframes refuse {
+  0%,
+  100% {
+    transform: none;
+  }
+  20%,
+  60% {
+    transform: translateX(-4px);
+  }
+  40%,
+  80% {
+    transform: translateX(4px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
